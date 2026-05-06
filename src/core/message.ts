@@ -44,6 +44,11 @@ export function createMessage<T>(
   };
 }
 
+export interface RegisterPayload {
+  watcher?: boolean;
+  capabilities: unknown[];
+}
+
 export function serializeMessage(msg: Message): string {
   return JSON.stringify(msg);
 }

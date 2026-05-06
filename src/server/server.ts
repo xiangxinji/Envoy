@@ -3,6 +3,7 @@ import { createMessage } from "../core/message.js";
 import type { Message } from "../core/message.js";
 import type { TaskResult, TaskProgress } from "../core/task.js";
 import type { CapabilityDefinition } from "../core/capability.js";
+import type { RegisterPayload } from "../core/message.js";
 import { ServerTransport } from "./transport.js";
 import { ConnectionManager } from "./connection-manager.js";
 import type { ClientState } from "./connection-manager.js";
@@ -48,6 +49,7 @@ export class Server extends EventEmitter<ServerEvents> {
   private capabilityRegistry: CapabilityRegistry;
   private taskDispatcher: TaskDispatcher;
   private messageRouter: MessageRouter;
+  private watchers = new Set<string>();
 
   /** 待处理任务映射表，用于跟踪异步任务结果 */
   private pendingTasks = new Map<
@@ -177,14 +179,18 @@ export class Server extends EventEmitter<ServerEvents> {
     this.transport.on("connection", (clientId: unknown) => {
       const id = clientId as string;
       this.connectionManager.addClient(id);
-      this.emit("client:online", this.connectionManager.getClient(id)!);
+      const state = this.connectionManager.getClient(id)!;
+      this.emit("client:online", state);
+      this.notifyWatchers("client:online", state);
     });
 
     this.transport.on("close", (clientId: unknown) => {
       const id = clientId as string;
+      this.watchers.delete(id);
       this.capabilityRegistry.unregister(id);
       this.connectionManager.removeClient(id);
       this.emit("client:offline", { id });
+      this.notifyWatchers("client:offline", { id });
     });
 
     this.transport.on("message", (clientId: unknown, msg: unknown) => {
@@ -197,7 +203,10 @@ export class Server extends EventEmitter<ServerEvents> {
   /** 设置连接管理器事件处理器 */
   private setupConnectionManagerHandlers(): void {
     this.connectionManager.on("client:offline", (clientId: unknown) => {
-      this.emit("client:offline", { id: clientId });
+      const id = clientId as string;
+      this.watchers.delete(id);
+      this.emit("client:offline", { id });
+      this.notifyWatchers("client:offline", { id });
     });
   }
 
@@ -228,16 +237,42 @@ export class Server extends EventEmitter<ServerEvents> {
     }
   }
 
+  /** 向所有 watcher 推送通知 */
+  private notifyWatchers(subtype: string, payload: unknown): void {
+    for (const watcherId of this.watchers) {
+      try {
+        this.notify(watcherId, subtype, payload);
+      } catch {
+        // watcher may have disconnected
+      }
+    }
+  }
+
   /** 处理客户端能力注册消息 */
   private handleRegister(clientId: string, msg: Message): void {
-    const caps = msg.payload as CapabilityDefinition[];
+    const payload = msg.payload as RegisterPayload;
+
+    if (payload.watcher) {
+      this.watchers.add(clientId);
+      // 推送初始快照
+      const snapshot = {
+        clients: this.connectionManager.getAllClients(),
+        capabilities: this.capabilityRegistry.getAllCapabilities(),
+      };
+      this.notify(clientId, "snapshot", snapshot);
+    }
+
+    const caps = payload.capabilities as CapabilityDefinition[];
     for (const cap of caps) {
       this.capabilityRegistry.register(clientId, cap);
     }
 
     const ack = createMessage("register_ack", "server", clientId, { success: true });
     this.transport.send(clientId, ack);
-    this.emit("client:registered", clientId, caps);
+    if (caps.length > 0) {
+      this.emit("client:registered", clientId, caps);
+      this.notifyWatchers("client:registered", { clientId, capabilities: caps });
+    }
   }
 
   /** 处理心跳消息，更新客户端状态 */
@@ -275,12 +310,14 @@ export class Server extends EventEmitter<ServerEvents> {
     }
 
     this.emit("task:completed", taskId, result);
+    this.notifyWatchers("task:completed", { taskId, result });
   }
 
   /** 处理任务执行进度更新 */
   private handleExecuteProgress(clientId: string, msg: Message): void {
     const progress = msg.payload as TaskProgress;
     this.emit("task:progress", progress.taskId, progress);
+    this.notifyWatchers("task:progress", progress);
   }
 
   /** 处理客户端发起的任务执行请求（用于客户端间调用） */

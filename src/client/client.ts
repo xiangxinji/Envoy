@@ -47,7 +47,7 @@ export interface ClientOptions {
  * 负责连接服务端、注册能力、执行任务
  */
 export class Client extends EventEmitter<ClientEvents> {
-  private transport: ClientTransport;
+  protected transport: ClientTransport;
   private heartbeat: Heartbeat;
   private queue: TaskQueue;
   private executor: TaskExecutor;
@@ -62,7 +62,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }>();
 
   /** 创建客户端实例 */
-  constructor(private options: ClientOptions) {
+  constructor(protected options: ClientOptions) {
     super();
 
     this.transport = new ClientTransport({
@@ -178,7 +178,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /** 发送能力注册消息 */
-  private sendRegister(): void {
+  protected sendRegister(): void {
     const defs = [...this.capabilities.values()].map(toDefinition);
     const msg = createMessage("register", this.options.id, "server", defs);
     this.transport.send(msg);
