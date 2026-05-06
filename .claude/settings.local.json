@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(node *)",
+      "Bash(npx openspec *)",
+      "Bash(npx tsx *)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)",
+      "Bash(echo \"EXIT_CODE: $?\")"
+    ]
+  }
+}
