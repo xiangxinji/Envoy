@@ -159,6 +159,58 @@ interface ClientOptions {
 | `message` | `Message` | 收到消息 |
 | `error` | `Error` | 错误 |
 
+### WatcherClient
+
+WatcherClient 是观察者客户端，用于监控服务端状态变更（如客户端上下线、能力注册等）。连接后会自动收到服务端的初始快照。
+
+```typescript
+import { WatcherClient } from "uniopc/client";
+
+const watcher = new WatcherClient({
+  id: "watcher-1",
+  servers: ["ws://localhost:9000"],
+});
+
+await watcher.connect();
+
+// 等待初始快照
+const snapshot = await watcher.waitForSnapshot();
+console.log("当前在线客户端:", snapshot.clients);
+console.log("所有能力:", snapshot.capabilities);
+
+// 也可以使用 getSnapshot() 同步获取（如果已缓存）
+const cached = watcher.getSnapshot();
+
+// 监听状态变更
+watcher.on("client:online", (state) => {
+  console.log("客户端上线:", state.id);
+});
+
+watcher.on("client:offline", (info) => {
+  console.log("客户端离线:", info.id);
+});
+
+watcher.on("client:registered", ({ clientId, capabilities }) => {
+  console.log(`${clientId} 注册了能力:`, capabilities.map(c => c.name));
+});
+```
+
+#### 事件
+
+| 事件 | 参数 | 说明 |
+|---|---|---|
+| `snapshot` | `WatcherSnapshot` | 收到初始快照 |
+| `client:online` | `ClientState` | 客户端上线 |
+| `client:offline` | `{ id }` | 客户端离线 |
+| `client:registered` | `{ clientId, capabilities }` | 客户端注册能力 |
+
+#### 方法
+
+| 方法 | 说明 |
+|---|---|
+| `getSnapshot()` | 获取已缓存的快照，未收到返回 `null` |
+| `waitForSnapshot()` | 等待快照，已缓存则立即返回 |
+
 ### 能力注册选项
 
 ```typescript
