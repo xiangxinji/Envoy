@@ -8,25 +8,44 @@ import { TaskQueue } from "./task-queue.js";
 import { TaskExecutor } from "./task-executor.js";
 import { type CapabilityRegistration, toDefinition } from "./capability.js";
 
+/** 客户端事件类型定义 */
 export type ClientEvents = {
+  /** 连接成功事件 */
   "connected": () => void;
+  /** 断开连接事件 */
   "disconnected": () => void;
+  /** 重连尝试事件 */
   "reconnecting": (attempt: number) => void;
+  /** 能力注册成功事件 */
   "registered": () => void;
+  /** 收到通知事件 */
   "notify": (msg: Message) => void;
+  /** 收到消息事件 */
   "message": (msg: Message) => void;
+  /** 错误事件 */
   "error": (payload: unknown) => void;
 };
 
+/** 客户端配置选项 */
 export interface ClientOptions {
+  /** 客户端唯一标识 */
   id: string;
+  /** 服务端地址列表 */
   servers: string[];
+  /** 心跳间隔（毫秒），默认 10000 */
   heartbeatInterval?: number;
+  /** 是否自动重连，默认 true */
   reconnect?: boolean;
+  /** 重连间隔（毫秒），默认 3000 */
   reconnectInterval?: number;
+  /** 最大重连尝试次数，默认 10 */
   maxReconnectAttempts?: number;
 }
 
+/**
+ * UniOpc 客户端主类
+ * 负责连接服务端、注册能力、执行任务
+ */
 export class Client extends EventEmitter<ClientEvents> {
   private transport: ClientTransport;
   private heartbeat: Heartbeat;
@@ -35,13 +54,14 @@ export class Client extends EventEmitter<ClientEvents> {
   private capabilities = new Map<string, CapabilityRegistration>();
   private taskCounter = 0;
 
-  // server-to-client task tracking
+  /** 服务端任务结果跟踪表 */
   private pendingResults = new Map<string, {
     resolve: (result: TaskResult) => void;
     reject: (err: Error) => void;
     timer: ReturnType<typeof setTimeout>;
   }>();
 
+  /** 创建客户端实例 */
   constructor(private options: ClientOptions) {
     super();
 
@@ -81,8 +101,9 @@ export class Client extends EventEmitter<ClientEvents> {
     this.setupTransport();
   }
 
-  // --- Public API ---
+  // --- 公共 API ---
 
+  /** 注册能力到服务端 */
   register(
     name: string,
     options: {
@@ -110,27 +131,32 @@ export class Client extends EventEmitter<ClientEvents> {
     this.capabilities.set(name, reg);
   }
 
+  /** 连接到服务端 */
   async connect(): Promise<void> {
     await this.transport.connect();
     this.heartbeat.start();
   }
 
+  /** 断开与服务端的连接 */
   disconnect(): void {
     this.heartbeat.stop();
     this.transport.disconnect();
   }
 
+  /** 请求服务端执行任务 */
   async execute(taskName: string, params: Record<string, unknown> = {}): Promise<unknown> {
     return this.executeOnServer(taskName, params);
   }
 
+  /** 向服务端发送消息 */
   send(subtype: string, payload: unknown): void {
     const msg = createMessage("message", this.options.id, "server", payload, { subtype });
     this.transport.send(msg);
   }
 
-  // --- Internal ---
+  // --- 内部方法 ---
 
+  /** 设置传输层事件处理器 */
   private setupTransport(): void {
     this.transport.on("open", () => {
       this.sendRegister();
@@ -151,12 +177,14 @@ export class Client extends EventEmitter<ClientEvents> {
     });
   }
 
+  /** 发送能力注册消息 */
   private sendRegister(): void {
     const defs = [...this.capabilities.values()].map(toDefinition);
     const msg = createMessage("register", this.options.id, "server", defs);
     this.transport.send(msg);
   }
 
+  /** 处理收到的消息，根据类型分发到对应处理器 */
   private handleMessage(msg: Message): void {
     switch (msg.type) {
       case "register_ack":
@@ -187,6 +215,7 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
+  /** 处理服务端下发的任务执行指令 */
   private handleExecute(msg: Message): void {
     const payload = msg.payload as {
       taskId: string;
@@ -229,6 +258,7 @@ export class Client extends EventEmitter<ClientEvents> {
     this.executor.processNext();
   }
 
+  /** 处理任务执行结果，发送回服务端 */
   private handleTaskResult(taskId: string, result: TaskResult): void {
     const msg = createMessage("execute_result", this.options.id, "server", result, {
       replyTo: taskId,
@@ -242,6 +272,7 @@ export class Client extends EventEmitter<ClientEvents> {
     this.executor.processNext();
   }
 
+  /** 处理任务执行进度更新 */
   private handleTaskProgress(taskId: string, progress: TaskProgress): void {
     const msg = createMessage("execute_progress", this.options.id, "server", progress);
     try {
@@ -251,6 +282,7 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
+  /** 处理服务端返回的任务执行结果 */
   private handleExecuteResult(msg: Message): void {
     const replyTo = msg.replyTo;
     if (!replyTo) return;
@@ -261,11 +293,13 @@ export class Client extends EventEmitter<ClientEvents> {
     pending.resolve(msg.payload as TaskResult);
   }
 
+  /** 处理任务中止指令 */
   private handleExecuteAbort(msg: Message): void {
     const { taskId } = msg.payload as { taskId: string };
     this.executor.abort(taskId);
   }
 
+  /** 向服务端发起任务执行请求 */
   private async executeOnServer(taskName: string, params: Record<string, unknown>): Promise<unknown> {
     const requestId = `req-${Date.now()}-${++this.taskCounter}`;
     const msg = createMessage("execute_request", this.options.id, "server", {

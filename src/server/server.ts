@@ -10,22 +10,38 @@ import { CapabilityRegistry } from "./capability-registry.js";
 import { TaskDispatcher } from "./task-dispatcher.js";
 import { MessageRouter } from "./message-router.js";
 
+/** 服务端事件类型定义 */
 export type ServerEvents = {
+  /** 客户端上线事件 */
   "client:online": (client: ClientState) => void;
+  /** 客户端离线事件 */
   "client:offline": (info: { id: string }) => void;
+  /** 客户端注册能力事件 */
   "client:registered": (clientId: string, caps: CapabilityDefinition[]) => void;
+  /** 任务完成事件 */
   "task:completed": (taskId: string, result: TaskResult) => void;
+  /** 任务进度事件 */
   "task:progress": (taskId: string, progress: TaskProgress) => void;
+  /** 收到消息事件 */
   "message": (clientId: string, msg: Message) => void;
 }
 
+/** 服务端配置选项 */
 export interface ServerOptions {
+  /** 监听端口 */
   port: number;
+  /** 监听主机地址，默认 0.0.0.0 */
   host?: string;
+  /** 心跳超时时间（毫秒），默认 30000 */
   heartbeatTimeout?: number;
+  /** 任务默认超时时间（毫秒），默认 60000 */
   defaultTaskTimeout?: number;
 }
 
+/**
+ * UniOpc 服务端主类
+ * 管理客户端连接、能力注册、任务调度等功能
+ */
 export class Server extends EventEmitter<ServerEvents> {
   private transport: ServerTransport;
   private connectionManager: ConnectionManager;
@@ -33,7 +49,7 @@ export class Server extends EventEmitter<ServerEvents> {
   private taskDispatcher: TaskDispatcher;
   private messageRouter: MessageRouter;
 
-  // task tracking
+  /** 待处理任务映射表，用于跟踪异步任务结果 */
   private pendingTasks = new Map<
     string,
     {
@@ -45,6 +61,7 @@ export class Server extends EventEmitter<ServerEvents> {
     }
   >();
 
+  /** 创建服务端实例 */
   constructor(private options: ServerOptions) {
     super();
 
@@ -74,11 +91,13 @@ export class Server extends EventEmitter<ServerEvents> {
     this.setupConnectionManagerHandlers();
   }
 
+  /** 启动服务端，开始监听连接 */
   async start(): Promise<void> {
     await this.transport.start();
     this.connectionManager.startTimeoutChecker();
   }
 
+  /** 停止服务端，断开所有连接 */
   async stop(): Promise<void> {
     this.connectionManager.stopTimeoutChecker();
     for (const [, pending] of this.pendingTasks) {
@@ -90,24 +109,29 @@ export class Server extends EventEmitter<ServerEvents> {
     await this.transport.stop();
   }
 
-  // --- Public API ---
+  // --- 公共 API ---
 
+  /** 获取指定客户端状态 */
   getClient(clientId: string) {
     return this.connectionManager.getClient(clientId);
   }
 
+  /** 获取所有客户端列表 */
   getClients() {
     return this.connectionManager.getAllClients();
   }
 
+  /** 获取在线客户端列表 */
   getOnlineClients() {
     return this.connectionManager.getOnlineClients();
   }
 
+  /** 获取指定客户端注册的能力列表 */
   getClientCapabilities(clientId: string): CapabilityDefinition[] {
     return this.capabilityRegistry.getClientCapabilities(clientId);
   }
 
+  /** 自动选择客户端执行任务 */
   async executeAny(
     taskName: string,
     params: Record<string, unknown>,
@@ -120,6 +144,7 @@ export class Server extends EventEmitter<ServerEvents> {
     return this.executeTo(clientId, taskName, params, options);
   }
 
+  /** 指定客户端执行任务 */
   async executeTo(
     clientId: string,
     taskName: string,
@@ -139,13 +164,15 @@ export class Server extends EventEmitter<ServerEvents> {
     });
   }
 
+  /** 向指定客户端发送通知 */
   notify(clientId: string, subtype: string, payload: unknown): void {
     const msg = createMessage("notify", "server", clientId, payload, { subtype });
     this.transport.send(clientId, msg);
   }
 
-  // --- Internal handlers ---
+  // --- 内部处理方法 ---
 
+  /** 设置传输层事件处理器 */
   private setupTransportHandlers(): void {
     this.transport.on("connection", (clientId: unknown) => {
       const id = clientId as string;
@@ -167,12 +194,14 @@ export class Server extends EventEmitter<ServerEvents> {
     });
   }
 
+  /** 设置连接管理器事件处理器 */
   private setupConnectionManagerHandlers(): void {
     this.connectionManager.on("client:offline", (clientId: unknown) => {
       this.emit("client:offline", { id: clientId });
     });
   }
 
+  /** 处理收到的消息，根据类型分发到对应处理器 */
   private handleMessage(clientId: string, msg: Message): void {
     switch (msg.type) {
       case "register":
@@ -199,6 +228,7 @@ export class Server extends EventEmitter<ServerEvents> {
     }
   }
 
+  /** 处理客户端能力注册消息 */
   private handleRegister(clientId: string, msg: Message): void {
     const caps = msg.payload as CapabilityDefinition[];
     for (const cap of caps) {
@@ -210,12 +240,14 @@ export class Server extends EventEmitter<ServerEvents> {
     this.emit("client:registered", clientId, caps);
   }
 
+  /** 处理心跳消息，更新客户端状态 */
   private handleHeartbeat(clientId: string, msg: Message): void {
     this.connectionManager.updateHeartbeat(clientId, msg.payload as any);
     const ack = createMessage("heartbeat_ack", "server", clientId, {});
     this.transport.send(clientId, ack);
   }
 
+  /** 处理任务执行结果 */
   private handleExecuteResult(_clientId: string, msg: Message): void {
     const taskId = msg.replyTo ?? (msg.payload as any).taskId;
 
@@ -245,11 +277,13 @@ export class Server extends EventEmitter<ServerEvents> {
     this.emit("task:completed", taskId, result);
   }
 
+  /** 处理任务执行进度更新 */
   private handleExecuteProgress(clientId: string, msg: Message): void {
     const progress = msg.payload as TaskProgress;
     this.emit("task:progress", progress.taskId, progress);
   }
 
+  /** 处理客户端发起的任务执行请求（用于客户端间调用） */
   private handleExecuteRequest(clientId: string, msg: Message): void {
     const { taskName, params, timeout } = msg.payload as {
       taskName: string;

@@ -2,27 +2,39 @@ import { WebSocket } from "ws";
 import { EventEmitter } from "../core/event-emitter.js";
 import { type Message, serializeMessage, deserializeMessage } from "../core/message.js";
 
+/** 客户端传输层配置选项 */
 export interface ClientTransportOptions {
+  /** 服务端 WebSocket 地址 */
   url: string;
+  /** 是否自动重连，默认 true */
   reconnect?: boolean;
+  /** 重连间隔（毫秒），默认 3000 */
   reconnectInterval?: number;
+  /** 最大重连尝试次数，默认 10 */
   maxReconnectAttempts?: number;
 }
 
+/**
+ * 客户端 WebSocket 传输层
+ * 负责与服务端的 WebSocket 连接和消息收发
+ */
 export class ClientTransport extends EventEmitter {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connected = false;
 
+  /** 创建客户端传输层实例 */
   constructor(private options: ClientTransportOptions) {
     super();
   }
 
+  /** 是否已连接 */
   get isConnected(): boolean {
     return this.connected;
   }
 
+  /** 连接到服务端 */
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.options.url);
@@ -61,6 +73,7 @@ export class ClientTransport extends EventEmitter {
     });
   }
 
+  /** 发送消息到服务端 */
   send(message: Message): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("Not connected");
@@ -68,6 +81,7 @@ export class ClientTransport extends EventEmitter {
     this.ws.send(serializeMessage(message));
   }
 
+  /** 断开连接 */
   disconnect(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -81,6 +95,7 @@ export class ClientTransport extends EventEmitter {
     this.connected = false;
   }
 
+  /** 尝试重新连接 */
   private tryReconnect(): void {
     if (!this.options.reconnect) return;
 

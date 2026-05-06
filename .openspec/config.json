@@ -1,0 +1,123 @@
+{
+  "name": "UniOpc",
+  "version": "0.1.0",
+  "description": "基于 WebSocket 的 Server/Client 通信框架，支持任务调度、能力注册、心跳检测等功能",
+  "type": "library",
+  "runtime": "node",
+  "language": "typescript",
+  "module": "esm",
+  "entry": "./src/index.ts",
+  "outDir": "./dist",
+  "exports": {
+    ".": "./dist/index.js",
+    "./server": "./dist/server/index.js",
+    "./client": "./dist/client/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^6.0.3"
+  },
+  "structure": {
+    "src/core": {
+      "description": "核心模块 - 消息协议、任务模型、能力接口、事件系统、错误类型",
+      "files": [
+        "message.ts",
+        "capability.ts",
+        "task.ts",
+        "queue.ts",
+        "event-emitter.ts",
+        "errors.ts"
+      ]
+    },
+    "src/server": {
+      "description": "服务端模块 - 管理客户端连接、注册能力、调度任务",
+      "files": [
+        "server.ts",
+        "transport.ts",
+        "connection-manager.ts",
+        "capability-registry.ts",
+        "task-dispatcher.ts",
+        "message-router.ts"
+      ]
+    },
+    "src/client": {
+      "description": "客户端模块 - 连接服务端、执行能力、管理任务队列",
+      "files": [
+        "client.ts",
+        "transport.ts",
+        "heartbeat.ts",
+        "capability.ts",
+        "task-queue.ts",
+        "task-executor.ts"
+      ]
+    },
+    "examples": {
+      "description": "示例代码 - 覆盖所有使用场景",
+      "files": [
+        "basic.ts",
+        "heartbeat.ts",
+        "timeout.ts",
+        "retry.ts",
+        "preemptive.ts",
+        "generator.ts",
+        "reconnect.ts",
+        "load-balance.ts",
+        "priority-queue.ts",
+        "error-handling.ts",
+        "notification.ts",
+        "client-to-client.ts"
+      ]
+    }
+  },
+  "features": [
+    "能力注册 - 客户端动态注册可执行能力",
+    "任务调度 - 自动选择或指定客户端执行任务",
+    "优先级队列 - 任务按优先级排序执行",
+    "任务抢占 - 高优先级任务可抢占低优先级任务",
+    "心跳检测 - 服务端通过心跳超时检测客户端离线",
+    "自动重连 - 客户端断线后自动重连",
+    "进度上报 - 任务执行过程中实时上报进度",
+    "客户端间通信 - 通过服务端路由调用其他客户端的能力"
+  ],
+  "keyTypes": {
+    "Server": "服务端主类",
+    "ServerOptions": "服务端配置",
+    "Client": "客户端主类",
+    "ClientOptions": "客户端配置",
+    "TaskContext": "任务执行上下文",
+    "TaskResult": "任务执行结果",
+    "TaskProgress": "任务进度信息",
+    "CapabilityDefinition": "能力定义",
+    "ParamDef": "参数定义"
+  },
+  "events": {
+    "server": [
+      "client:online",
+      "client:offline",
+      "client:registered",
+      "task:completed",
+      "task:progress",
+      "message"
+    ],
+    "client": [
+      "connected",
+      "disconnected",
+      "reconnecting",
+      "registered",
+      "notify",
+      "notify:<subtype>",
+      "message",
+      "message:<subtype>",
+      "error"
+    ]
+  }
+}

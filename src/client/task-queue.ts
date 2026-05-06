@@ -2,23 +2,31 @@ import { EventEmitter } from "../core/event-emitter.js";
 import { PriorityQueue } from "../core/queue.js";
 import type { TaskInstance } from "../core/task.js";
 
+/**
+ * 任务队列
+ * 管理待执行任务，支持优先级排序和抢占
+ */
 export class TaskQueue extends EventEmitter {
   private queue = new PriorityQueue();
   private running: TaskInstance | null = null;
   private suspended: TaskInstance[] = [];
 
+  /** 队列长度 */
   get queueLength(): number {
     return this.queue.length;
   }
 
+  /** 当前正在执行的任务 */
   get currentTask(): TaskInstance | null {
     return this.running;
   }
 
+  /** 被挂起的任务列表 */
   get suspendedTasks(): TaskInstance[] {
     return [...this.suspended];
   }
 
+  /** 将任务加入队列，支持抢占逻辑 */
   enqueue(task: TaskInstance): void {
     if (task.mode === "preemptive" && this.running && task.priority > this.running.priority) {
       // preempt: suspend current, run new one
@@ -33,6 +41,7 @@ export class TaskQueue extends EventEmitter {
     this.emit("changed");
   }
 
+  /** 获取下一个待执行任务，优先恢复挂起任务 */
   next(): TaskInstance | null {
     // check suspended tasks first (resume highest priority)
     if (this.suspended.length > 0) {
@@ -55,6 +64,7 @@ export class TaskQueue extends EventEmitter {
     return task;
   }
 
+  /** 标记任务完成 */
   complete(taskId: string): TaskInstance | null {
     if (this.running?.id === taskId) {
       this.running.status = "completed";
@@ -66,6 +76,7 @@ export class TaskQueue extends EventEmitter {
     return null;
   }
 
+  /** 标记任务失败 */
   fail(taskId: string): TaskInstance | null {
     if (this.running?.id === taskId) {
       this.running.status = "failed";
@@ -77,6 +88,7 @@ export class TaskQueue extends EventEmitter {
     return null;
   }
 
+  /** 中止指定任务 */
   abort(taskId: string): boolean {
     // abort running
     if (this.running?.id === taskId) {
@@ -101,6 +113,7 @@ export class TaskQueue extends EventEmitter {
     return false;
   }
 
+  /** 检查是否应该发生抢占 */
   shouldPreempt(currentPriority: number): boolean {
     const next = this.queue.peek();
     return next !== undefined && next.mode === "preemptive" && next.priority > currentPriority;

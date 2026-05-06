@@ -1,11 +1,16 @@
 import type { CapabilityDefinition } from "../core/capability.js";
 
+/**
+ * 能力注册表
+ * 管理客户端注册的能力，支持按客户端或能力名称查询
+ */
 export class CapabilityRegistry {
-  // clientId → capabilities
+  /** 客户端 ID → 能力映射表 */
   private clientCaps = new Map<string, Map<string, CapabilityDefinition>>();
-  // capabilityName → clientIds
+  /** 能力名称 → 客户端 ID 集合映射表 */
   private capClients = new Map<string, Set<string>>();
 
+  /** 注册客户端能力 */
   register(clientId: string, capability: CapabilityDefinition): void {
     let caps = this.clientCaps.get(clientId);
     if (!caps) {
@@ -22,6 +27,7 @@ export class CapabilityRegistry {
     clients.add(clientId);
   }
 
+  /** 注销客户端的所有能力 */
   unregister(clientId: string): void {
     const caps = this.clientCaps.get(clientId);
     if (caps) {
@@ -35,20 +41,24 @@ export class CapabilityRegistry {
     }
   }
 
+  /** 获取指定客户端注册的所有能力 */
   getClientCapabilities(clientId: string): CapabilityDefinition[] {
     const caps = this.clientCaps.get(clientId);
     return caps ? [...caps.values()] : [];
   }
 
+  /** 获取拥有指定能力的所有客户端 ID */
   getClientsForCapability(capName: string): string[] {
     const clients = this.capClients.get(capName);
     return clients ? [...clients] : [];
   }
 
+  /** 检查客户端是否拥有指定能力 */
   hasCapability(clientId: string, capName: string): boolean {
     return this.clientCaps.get(clientId)?.has(capName) ?? false;
   }
 
+  /** 获取所有客户端的能力映射 */
   getAllCapabilities(): Map<string, CapabilityDefinition[]> {
     const result = new Map<string, CapabilityDefinition[]>();
     for (const [clientId, caps] of this.clientCaps) {

@@ -4,18 +4,28 @@ import type { TaskResult } from "../core/task.js";
 import type { ConnectionManager } from "./connection-manager.js";
 import type { CapabilityRegistry } from "./capability-registry.js";
 
+/** 任务调度器配置选项 */
 export interface DispatcherOptions {
-  defaultTimeout?: number; // ms, default 60000
+  /** 默认任务超时时间（毫秒），默认 60000 */
+  defaultTimeout?: number;
 }
 
+/** 任务分发结果 */
 export interface DispatchResult {
+  /** 任务 ID */
   taskId: string;
+  /** 目标客户端 ID */
   clientId: string;
 }
 
+/**
+ * 任务调度器
+ * 负责选择合适的客户端并分发任务
+ */
 export class TaskDispatcher {
   private taskCounter = 0;
 
+  /** 创建任务调度器实例 */
   constructor(
     private connectionManager: ConnectionManager,
     private capabilityRegistry: CapabilityRegistry,
@@ -23,6 +33,7 @@ export class TaskDispatcher {
     private options: DispatcherOptions = {}
   ) {}
 
+  /** 选择最适合执行指定能力的客户端 */
   selectClient(capName: string): string | undefined {
     const clientIds = this.capabilityRegistry.getClientsForCapability(capName);
     if (clientIds.length === 0) return undefined;
@@ -47,6 +58,7 @@ export class TaskDispatcher {
     return online[0];
   }
 
+  /** 向指定客户端分发任务 */
   dispatch(
     clientId: string,
     taskName: string,
@@ -69,6 +81,7 @@ export class TaskDispatcher {
     return taskId;
   }
 
+  /** 向指定客户端发送任务中止指令 */
   sendAbort(clientId: string, taskId: string): void {
     const msg = createMessage("execute_abort", "server", clientId, { taskId });
     this.send(clientId, msg);

@@ -8,7 +8,8 @@
       "Bash(npx tsx *)",
       "Bash(netstat -ano)",
       "Bash(taskkill *)",
-      "Bash(echo \"EXIT_CODE: $?\")"
+      "Bash(echo \"EXIT_CODE: $?\")",
+      "Bash(npm run *)"
     ]
   }
 }

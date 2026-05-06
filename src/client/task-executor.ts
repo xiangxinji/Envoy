@@ -2,11 +2,19 @@ import type { TaskInstance, TaskResult, TaskProgress } from "../core/task.js";
 import type { CapabilityRegistration, TaskContext } from "./capability.js";
 import type { TaskQueue } from "./task-queue.js";
 
+/** 任务结果回调函数类型 */
 export type OnResult = (taskId: string, result: TaskResult) => void;
+/** 任务进度回调函数类型 */
 export type OnProgress = (taskId: string, progress: TaskProgress) => void;
+/** 任务执行请求回调函数类型 */
 export type OnExecuteRequest = (taskName: string, params: Record<string, unknown>) => Promise<unknown>;
 
+/**
+ * 任务执行器
+ * 负责执行任务队列中的任务，支持重试和抢占
+ */
 export class TaskExecutor {
+  /** 创建任务执行器实例 */
   constructor(
     private queue: TaskQueue,
     private capabilities: Map<string, CapabilityRegistration>,
@@ -15,6 +23,7 @@ export class TaskExecutor {
     private onExecuteRequest: OnExecuteRequest
   ) {}
 
+  /** 处理下一个待执行任务 */
   async processNext(): Promise<void> {
     const task = this.queue.next();
     if (!task) return;
@@ -49,10 +58,12 @@ export class TaskExecutor {
     }
   }
 
+  /** 中止指定任务 */
   abort(taskId: string): boolean {
     return this.queue.abort(taskId);
   }
 
+  /** 使用能力执行任务 */
   private async executeWithCapability(
     task: TaskInstance,
     cap: CapabilityRegistration
@@ -77,6 +88,7 @@ export class TaskExecutor {
     return (cap.execute as (ctx: TaskContext) => Promise<unknown>)(ctx);
   }
 
+  /** 执行生成器模式任务（支持抢占） */
   private async executeGenerator(
     task: TaskInstance,
     cap: CapabilityRegistration,
@@ -111,6 +123,7 @@ export class TaskExecutor {
     return result.value;
   }
 
+  /** 判断是否为生成器函数 */
   private isGeneratorFn(fn: (...args: any[]) => any): boolean {
     return fn.constructor?.name === "GeneratorFunction";
   }
