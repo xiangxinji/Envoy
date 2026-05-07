@@ -180,7 +180,7 @@ export class Client extends EventEmitter<ClientEvents> {
   /** 发送能力注册消息 */
   protected sendRegister(): void {
     const defs = [...this.capabilities.values()].map(toDefinition);
-    const msg = createMessage("register", this.options.id, "server", defs);
+    const msg = createMessage("register", this.options.id, "server", { capabilities: defs });
     this.transport.send(msg);
   }
 

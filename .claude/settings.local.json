@@ -9,7 +9,13 @@
       "Bash(netstat -ano)",
       "Bash(taskkill *)",
       "Bash(echo \"EXIT_CODE: $?\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(openspec new *)",
+      "Bash(openspec status *)",
+      "Bash(openspec instructions *)",
+      "Bash(curl -s http://localhost:3000/api/status)",
+      "Bash(curl -s http://localhost:3000/api/clients)",
+      "Bash(curl -s http://localhost:3000/api/capabilities)"
     ]
   }
 }
