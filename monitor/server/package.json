@@ -1,10 +1,11 @@
 {
-  "name": "uniopc-monitor",
+  "name": "uniopc-monitor-server",
   "version": "0.1.0",
   "type": "module",
   "private": true,
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "start": "node dist/index.js"
   },
   "dependencies": {

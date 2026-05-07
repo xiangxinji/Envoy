@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import type { WatcherSnapshot } from "uniopc/client";
 
 type ClientState = WatcherSnapshot["clients"][number];
@@ -9,6 +10,13 @@ export interface MonitorStatus {
   busyClients: number;
   totalCapabilities: number;
   connectedAt: number;
+}
+
+export interface StateStoreEvents {
+  init: (data: { clients: ClientState[]; capabilities: CapabilityDefinition[]; status: MonitorStatus }) => void;
+  "client:online": (state: ClientState) => void;
+  "client:offline": (info: { id: string }) => void;
+  "client:registered": (data: { clientId: string; capabilities: CapabilityDefinition[] }) => void;
 }
 
 function flattenCapabilities(raw: unknown): CapabilityDefinition[] {
@@ -23,7 +31,7 @@ function flattenCapabilities(raw: unknown): CapabilityDefinition[] {
   return [];
 }
 
-export class StateStore {
+export class StateStore extends EventEmitter {
   private clients = new Map<string, ClientState>();
   private capabilities: CapabilityDefinition[] = [];
   private _connected = false;
@@ -35,10 +43,16 @@ export class StateStore {
     }
     this.capabilities = flattenCapabilities(snapshot.capabilities as unknown);
     this._connected = true;
+    this.emit("init", {
+      clients: this.getAllClients(),
+      capabilities: this.getCapabilities(),
+      status: this.getStatus(),
+    });
   }
 
   applyClientOnline(state: ClientState): void {
     this.clients.set(state.id, state);
+    this.emit("client:online", state);
   }
 
   applyClientOffline(id: string): void {
@@ -46,6 +60,7 @@ export class StateStore {
     if (client) {
       client.status = "offline";
     }
+    this.emit("client:offline", { id });
   }
 
   applyClientRegistered(data: { clientId: string; capabilities: CapabilityDefinition[] }): void {
@@ -53,6 +68,11 @@ export class StateStore {
       (c) => !data.capabilities.some((nc) => nc.name === c.name)
     );
     this.capabilities.push(...data.capabilities);
+    this.emit("client:registered", data);
+  }
+
+  setDisconnected(): void {
+    this._connected = false;
   }
 
   getAllClients(): ClientState[] {
@@ -78,7 +98,7 @@ export class StateStore {
       onlineClients: clients.filter((c) => c.status === "online").length,
       busyClients: clients.filter((c) => c.status === "busy").length,
       totalCapabilities: this.capabilities.length,
-      connectedAt: this._connected ? 1 : 0,
+      connectedAt: this._connected ? Date.now() : 0,
     };
   }
 }
