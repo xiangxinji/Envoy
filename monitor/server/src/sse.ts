@@ -13,6 +13,7 @@ export function createSSEApp(store: StateStore): Hono {
         data: JSON.stringify({
           clients: store.getAllClients(),
           capabilities: store.getCapabilities(),
+          tasks: store.getAllTasks(),
           status: store.getStatus(),
         }),
       });
@@ -29,17 +30,27 @@ export function createSSEApp(store: StateStore): Hono {
       const onClientRegistered = async (data: unknown) => {
         await stream.writeSSE({ event: "client:registered", data: JSON.stringify(data) });
       };
+      const onTaskCreated = async (task: unknown) => {
+        await stream.writeSSE({ event: "task:created", data: JSON.stringify(task) });
+      };
+      const onTaskUpdated = async (task: unknown) => {
+        await stream.writeSSE({ event: "task:updated", data: JSON.stringify(task) });
+      };
 
       store.on("init", onInit);
       store.on("client:online", onClientOnline);
       store.on("client:offline", onClientOffline);
       store.on("client:registered", onClientRegistered);
+      store.on("task:created", onTaskCreated);
+      store.on("task:updated", onTaskUpdated);
 
       stream.onAbort(() => {
         store.off("init", onInit);
         store.off("client:online", onClientOnline);
         store.off("client:offline", onClientOffline);
         store.off("client:registered", onClientRegistered);
+        store.off("task:created", onTaskCreated);
+        store.off("task:updated", onTaskUpdated);
       });
 
       // Keep connection alive

@@ -1,7 +1,7 @@
 import { EventEmitter } from "../core/event-emitter.js";
 import { createMessage } from "../core/message.js";
 import type { Message } from "../core/message.js";
-import type { TaskResult, TaskProgress } from "../core/task.js";
+import type { TaskResult, TaskProgress, TaskRecord, TaskHistoryEntry } from "../core/task.js";
 import type { CapabilityDefinition } from "../core/capability.js";
 import type { RegisterPayload } from "../core/message.js";
 import { ServerTransport } from "./transport.js";
@@ -50,6 +50,7 @@ export class Server extends EventEmitter<ServerEvents> {
   private taskDispatcher: TaskDispatcher;
   private messageRouter: MessageRouter;
   private watchers = new Set<string>();
+  private tasks = new Map<string, TaskRecord>();
 
   /** 待处理任务映射表，用于跟踪异步任务结果 */
   private pendingTasks = new Map<
@@ -156,6 +157,22 @@ export class Server extends EventEmitter<ServerEvents> {
     const timeout = options?.timeout ?? this.options.defaultTaskTimeout ?? 60000;
     const taskId = this.taskDispatcher.dispatch(clientId, taskName, params, options);
 
+    const now = Date.now();
+    const record: TaskRecord = {
+      id: taskId,
+      name: taskName,
+      params,
+      status: "pending",
+      initiator: "server",
+      createdAt: now,
+      history: [
+        { type: "created", at: now, by: "server" },
+        { type: "dispatched", at: now, to: clientId },
+      ],
+    };
+    this.tasks.set(taskId, record);
+    this.notifyWatchers("task:created", record);
+
     return new Promise<TaskResult>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingTasks.delete(taskId);
@@ -258,6 +275,7 @@ export class Server extends EventEmitter<ServerEvents> {
       const snapshot = {
         clients: this.connectionManager.getAllClients(),
         capabilities: this.capabilityRegistry.getAllCapabilities(),
+        tasks: [...this.tasks.values()],
       };
       this.notify(clientId, "snapshot", snapshot);
     }
@@ -283,7 +301,7 @@ export class Server extends EventEmitter<ServerEvents> {
   }
 
   /** 处理任务执行结果 */
-  private handleExecuteResult(_clientId: string, msg: Message): void {
+  private handleExecuteResult(clientId: string, msg: Message): void {
     const taskId = msg.replyTo ?? (msg.payload as any).taskId;
 
     // check if this is a client-to-client result that needs forwarding
@@ -310,14 +328,46 @@ export class Server extends EventEmitter<ServerEvents> {
     }
 
     this.emit("task:completed", taskId, result);
-    this.notifyWatchers("task:completed", { taskId, result });
+
+    const record = this.tasks.get(taskId);
+    if (record) {
+      if (result.success) {
+        record.status = "completed";
+        record.history.push({ type: "completed", at: Date.now(), by: clientId, result });
+      } else {
+        record.status = "failed";
+        record.history.push({ type: "failed", at: Date.now(), by: clientId, error: result.error ?? "Unknown error" });
+      }
+      this.notifyWatchers("task:updated", record);
+    }
   }
 
   /** 处理任务执行进度更新 */
   private handleExecuteProgress(clientId: string, msg: Message): void {
     const progress = msg.payload as TaskProgress;
     this.emit("task:progress", progress.taskId, progress);
-    this.notifyWatchers("task:progress", progress);
+
+    const record = this.tasks.get(progress.taskId);
+    if (record) {
+      record.status = "running";
+      const existingIdx = record.history.findIndex(
+        (e) => e.type === "progress" && e.step === progress.step
+      );
+      const entry: TaskHistoryEntry = {
+        type: "progress",
+        at: Date.now(),
+        by: clientId,
+        step: progress.step,
+        progress: progress.progress,
+        message: progress.message,
+      };
+      if (existingIdx >= 0) {
+        record.history[existingIdx] = entry;
+      } else {
+        record.history.push(entry);
+      }
+      this.notifyWatchers("task:updated", record);
+    }
   }
 
   /** 处理客户端发起的任务执行请求（用于客户端间调用） */
@@ -341,6 +391,22 @@ export class Server extends EventEmitter<ServerEvents> {
     const taskId = this.taskDispatcher.dispatch(targetClientId, taskName, params, {
       timeout: effectiveTimeout,
     });
+
+    const now = Date.now();
+    const record: TaskRecord = {
+      id: taskId,
+      name: taskName,
+      params,
+      status: "pending",
+      initiator: clientId,
+      createdAt: now,
+      history: [
+        { type: "created", at: now, by: clientId },
+        { type: "dispatched", at: now, to: targetClientId },
+      ],
+    };
+    this.tasks.set(taskId, record);
+    this.notifyWatchers("task:created", record);
 
     // track for forwarding result back
     this.messageRouter.trackRequest(taskId, clientId, effectiveTimeout, () => {

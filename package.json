@@ -5,7 +5,8 @@
   "main": "./dist/index.js",
   "exports": {
     "./server": "./dist/server/index.js",
-    "./client": "./dist/client/index.js"
+    "./client": "./dist/client/index.js",
+    "./core/*": "./dist/core/*.js"
   },
   "scripts": {
     "build": "tsc",

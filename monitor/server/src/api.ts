@@ -24,5 +24,17 @@ export function createApiApp(store: StateStore): Hono {
     return c.json(store.getCapabilities());
   });
 
+  app.get("/api/tasks", (c) => {
+    return c.json(store.getAllTasks());
+  });
+
+  app.get("/api/tasks/:id", (c) => {
+    const task = store.getTask(c.req.param("id"));
+    if (!task) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+    return c.json(task);
+  });
+
   return app;
 }

@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { WatcherSnapshot } from "uniopc/client";
+import type { TaskRecord } from "uniopc/core/task";
 
 type ClientState = WatcherSnapshot["clients"][number];
 type CapabilityDefinition = WatcherSnapshot["capabilities"][number];
@@ -13,10 +14,12 @@ export interface MonitorStatus {
 }
 
 export interface StateStoreEvents {
-  init: (data: { clients: ClientState[]; capabilities: CapabilityDefinition[]; status: MonitorStatus }) => void;
+  init: (data: { clients: ClientState[]; capabilities: CapabilityDefinition[]; tasks: TaskRecord[]; status: MonitorStatus }) => void;
   "client:online": (state: ClientState) => void;
   "client:offline": (info: { id: string }) => void;
   "client:registered": (data: { clientId: string; capabilities: CapabilityDefinition[] }) => void;
+  "task:created": (task: TaskRecord) => void;
+  "task:updated": (task: TaskRecord) => void;
 }
 
 function flattenCapabilities(raw: unknown): CapabilityDefinition[] {
@@ -34,6 +37,7 @@ function flattenCapabilities(raw: unknown): CapabilityDefinition[] {
 export class StateStore extends EventEmitter {
   private clients = new Map<string, ClientState>();
   private capabilities: CapabilityDefinition[] = [];
+  private tasks = new Map<string, TaskRecord>();
   private _connected = false;
 
   applySnapshot(snapshot: WatcherSnapshot): void {
@@ -42,10 +46,17 @@ export class StateStore extends EventEmitter {
       this.clients.set(client.id, client);
     }
     this.capabilities = flattenCapabilities(snapshot.capabilities as unknown);
+    if ((snapshot as any).tasks) {
+      this.tasks.clear();
+      for (const task of (snapshot as any).tasks as TaskRecord[]) {
+        this.tasks.set(task.id, task);
+      }
+    }
     this._connected = true;
     this.emit("init", {
       clients: this.getAllClients(),
       capabilities: this.getCapabilities(),
+      tasks: this.getAllTasks(),
       status: this.getStatus(),
     });
   }
@@ -73,6 +84,24 @@ export class StateStore extends EventEmitter {
 
   setDisconnected(): void {
     this._connected = false;
+  }
+
+  applyTaskCreated(task: TaskRecord): void {
+    this.tasks.set(task.id, task);
+    this.emit("task:created", task);
+  }
+
+  applyTaskUpdated(task: TaskRecord): void {
+    this.tasks.set(task.id, task);
+    this.emit("task:updated", task);
+  }
+
+  getAllTasks(): TaskRecord[] {
+    return [...this.tasks.values()];
+  }
+
+  getTask(id: string): TaskRecord | undefined {
+    return this.tasks.get(id);
   }
 
   getAllClients(): ClientState[] {

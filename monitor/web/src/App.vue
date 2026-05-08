@@ -2,10 +2,8 @@
 import { useSSE } from './composables/useSSE'
 import ConnectionBadge from './components/ConnectionBadge.vue'
 import StatsCard from './components/StatsCard.vue'
-import ClientTable from './components/ClientTable.vue'
-import CapabilityGrid from './components/CapabilityGrid.vue'
 
-const { clients, capabilities, status, connected } = useSSE()
+const { clients, capabilities, tasks, status, connected } = useSSE()
 </script>
 
 <template>
@@ -15,23 +13,38 @@ const { clients, capabilities, status, connected } = useSSE()
       <ConnectionBadge :connected="connected" />
     </header>
 
-    <main class="max-w-6xl mx-auto px-6 py-6 space-y-8">
-      <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <nav class="border-b border-slate-700 bg-slate-800/50 px-6 flex gap-1">
+      <router-link
+        to="/clients"
+        class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors"
+        active-class="bg-slate-900 text-slate-100"
+        inactive-class="text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+      >
+        Clients
+      </router-link>
+      <router-link
+        to="/tasks"
+        class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors"
+        active-class="bg-slate-900 text-slate-100"
+        inactive-class="text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+      >
+        Tasks
+      </router-link>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-6 py-6">
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <StatsCard label="客户端总数" :value="status.totalClients" />
         <StatsCard label="在线客户端" :value="status.onlineClients" color="green" />
         <StatsCard label="忙碌客户端" :value="status.busyClients" color="yellow" />
         <StatsCard label="已注册能力" :value="status.totalCapabilities" color="blue" />
       </section>
 
-      <section>
-        <h2 class="text-base font-medium text-slate-300 mb-3 pb-2 border-b border-slate-700">客户端状态</h2>
-        <ClientTable :clients="clients" />
-      </section>
-
-      <section>
-        <h2 class="text-base font-medium text-slate-300 mb-3 pb-2 border-b border-slate-700">能力列表</h2>
-        <CapabilityGrid :capabilities="capabilities" />
-      </section>
+      <router-view
+        :clients="clients"
+        :capabilities="capabilities"
+        :tasks="tasks"
+      />
     </main>
   </div>
 </template>

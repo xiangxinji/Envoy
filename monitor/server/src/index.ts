@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { WatcherClient } from "uniopc/client";
 import type { WatcherSnapshot, WatcherClientEvents } from "uniopc/client";
+import type { TaskRecord } from "uniopc/core/task";
 import { StateStore } from "./state-store.js";
 import { createApiApp } from "./api.js";
 import { createSSEApp } from "./sse.js";
@@ -40,6 +41,16 @@ watcher.on("client:offline", (info: unknown) => {
 watcher.on("client:registered", (data: unknown) => {
   store.applyClientRegistered(data as ClientRegisteredData);
   console.log(`[monitor] 客户端注册能力: ${(data as ClientRegisteredData).clientId}`);
+});
+
+watcher.on("task:created", (task: unknown) => {
+  store.applyTaskCreated(task as TaskRecord);
+  console.log(`[monitor] 任务创建: ${(task as TaskRecord).id}`);
+});
+
+watcher.on("task:updated", (task: unknown) => {
+  store.applyTaskUpdated(task as TaskRecord);
+  console.log(`[monitor] 任务更新: ${(task as TaskRecord).id} -> ${(task as TaskRecord).status}`);
 });
 
 watcher.on("error", (err: unknown) => {

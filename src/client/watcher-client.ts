@@ -3,10 +3,12 @@ import type { ClientOptions } from "./client.js";
 import { createMessage } from "../core/message.js";
 import type { ClientState } from "../server/index.js";
 import type { CapabilityDefinition } from "../core/capability.js";
+import type { TaskRecord } from "../core/task.js";
 
 export interface WatcherSnapshot {
   clients: ClientState[];
   capabilities: CapabilityDefinition[];
+  tasks: TaskRecord[];
 }
 
 export interface WatcherClientEvents {
@@ -14,6 +16,8 @@ export interface WatcherClientEvents {
   "client:online": (state: ClientState) => void;
   "client:offline": (info: { id: string }) => void;
   "client:registered": (data: { clientId: string; capabilities: CapabilityDefinition[] }) => void;
+  "task:created": (task: TaskRecord) => void;
+  "task:updated": (task: TaskRecord) => void;
 }
 
 export class WatcherClient extends Client {
@@ -55,6 +59,14 @@ export class WatcherClient extends Client {
 
     this.on("notify:client:registered", (data) => {
       this.emit("client:registered", data as { clientId: string; capabilities: CapabilityDefinition[] });
+    });
+
+    this.on("notify:task:created", (task) => {
+      this.emit("task:created", task as TaskRecord);
+    });
+
+    this.on("notify:task:updated", (task) => {
+      this.emit("task:updated", task as TaskRecord);
     });
   }
 

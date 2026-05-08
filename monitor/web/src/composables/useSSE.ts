@@ -28,8 +28,29 @@ interface MonitorStatus {
   connectedAt: number
 }
 
+interface TaskRecord {
+  id: string
+  name: string
+  params: Record<string, unknown>
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  initiator: string
+  createdAt: number
+  history: TaskHistoryEntry[]
+}
+
+export type TaskHistoryEntry =
+  | { type: 'created'; at: number; by: string }
+  | { type: 'dispatched'; at: number; to: string }
+  | { type: 'started'; at: number; by: string }
+  | { type: 'progress'; at: number; by: string; step: string | number; progress: number; message?: string }
+  | { type: 'completed'; at: number; by: string; result: { success: boolean; data?: unknown; error?: string; duration: number } }
+  | { type: 'failed'; at: number; by: string; error: string }
+
+export type { TaskRecord, ClientState, CapabilityDefinition, MonitorStatus }
+
 const clients = ref<ClientState[]>([])
 const capabilities = ref<CapabilityDefinition[]>([])
+const tasks = ref<TaskRecord[]>([])
 const status = ref<MonitorStatus>({
   totalClients: 0,
   onlineClients: 0,
@@ -50,6 +71,7 @@ function connect() {
     const data = JSON.parse(e.data)
     clients.value = data.clients ?? []
     capabilities.value = data.capabilities ?? []
+    tasks.value = data.tasks ?? []
     status.value = data.status ?? status.value
     connected.value = true
   })
@@ -81,6 +103,21 @@ function connect() {
     capabilities.value.push(...data.capabilities)
   })
 
+  es.addEventListener('task:created', (e) => {
+    const task = JSON.parse(e.data) as TaskRecord
+    tasks.value.unshift(task)
+  })
+
+  es.addEventListener('task:updated', (e) => {
+    const task = JSON.parse(e.data) as TaskRecord
+    const idx = tasks.value.findIndex((t) => t.id === task.id)
+    if (idx >= 0) {
+      tasks.value[idx] = task
+    } else {
+      tasks.value.unshift(task)
+    }
+  })
+
   es.onopen = () => {
     connected.value = true
   }
@@ -103,5 +140,5 @@ export function useSSE() {
   connect()
   onUnmounted(disconnect)
 
-  return { clients, capabilities, status, connected }
+  return { clients, capabilities, tasks, status, connected }
 }
