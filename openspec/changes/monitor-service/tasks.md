@@ -34,5 +34,5 @@
 
 - [x] 5.1 创建 `examples/monitor/src/index.ts`，整合 WatcherClient、StateStore、Hono app
 - [x] 5.2 配置 WatcherClient 事件监听，将事件转发到 StateStore
-- [x] 5.3 添加启动参数解析（UniOpc Server 地址、Monitor HTTP 端口）
+- [x] 5.3 添加启动参数解析（Envoy Server 地址、Monitor HTTP 端口）
 - [x] 5.4 编译验证：确保 TypeScript 编译通过

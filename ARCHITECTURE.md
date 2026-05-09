@@ -1,8 +1,8 @@
-# UniOpc 架构说明文档
+# Envoy 架构说明文档
 
 ## 一、项目简介
 
-UniOpc 是一个基于 WebSocket 的 Server/Client 分布式任务调度框架。Server 负责管理客户端连接、能力注册和任务调度，Client 连接 Server 注册能力并执行任务。内置 WatcherClient 机制支持实时监控。
+Envoy 是一个基于 WebSocket 的 Server/Client 分布式任务调度框架。Server 负责管理客户端连接、能力注册和任务调度，Client 连接 Server 注册能力并执行任务。内置 WatcherClient 机制支持实时监控。
 
 ---
 
@@ -22,7 +22,7 @@ UniOpc 是一个基于 WebSocket 的 Server/Client 分布式任务调度框架�
 ## 三、目录结构
 
 ```
-UniOpc/
+Envoy/
 ├── src/                          # 主框架源码
 │   ├── core/                     # 核心类型定义
 │   │   ├── message.ts            # 消息协议与序列化
@@ -107,7 +107,7 @@ UniOpc/
                                        │ WatcherClient (WebSocket)
                                        │
 ┌──────────────────────────────────────┼──────────────────────────┐
-│                    UniOpc Server     │                          │
+│                    Envoy Server     │                          │
 │  ┌───────────────────────────────────┴─────────────────────┐   │
 │  │                      Server 主类                         │   │
 │  │  ┌───────────────┐  ┌──────────────┐  ┌──────────────┐  │   │
@@ -192,7 +192,7 @@ TaskRecord {
 ### 5.3 监控数据流
 
 ```
-UniOpc Server ──notify──▶ WatcherClient ──事件──▶ StateStore ──SSE──▶ Vue Frontend
+Envoy Server ──notify──▶ WatcherClient ──事件──▶ StateStore ──SSE──▶ Vue Frontend
                               │                      │
                               │ snapshot (全量)       │ REST API (/api/*)
                               │ task:created (增量)   │
@@ -274,7 +274,7 @@ interface WatcherClientEvents {
 | `state-store.ts` | 接收 WatcherClient 事件，维护 clients/capabilities/tasks 的内存状态 |
 | `api.ts` | REST 端点：/api/status、/api/clients、/api/clients/:id、/api/capabilities、/api/tasks、/api/tasks/:id |
 | `sse.ts` | SSE 端点：init（全量）、client:*、task:* 增量推送 |
-| `index.ts` | 启动入口，连接 UniOpc Server，启动 Hono HTTP 服务 |
+| `index.ts` | 启动入口，连接 Envoy Server，启动 Hono HTTP 服务 |
 
 ### 6.5 Monitor 前端
 
@@ -339,10 +339,10 @@ interface WatcherClientEvents {
 
 ```json
 {
-  "uniopc": "./dist/index.js",          // Server + Client + WatcherClient
-  "uniopc/server": "./dist/server/",    // Server 相关
-  "uniopc/client": "./dist/client/",    // Client + WatcherClient
-  "uniopc/core/*": "./dist/core/*"      // TaskRecord, TaskHistoryEntry 等类型
+  "envoy": "./dist/index.js",          // Server + Client + WatcherClient
+  "envoy/server": "./dist/server/",    // Server 相关
+  "envoy/client": "./dist/client/",    // Client + WatcherClient
+  "envoy/core/*": "./dist/core/*"      // TaskRecord, TaskHistoryEntry 等类型
 }
 ```
 
@@ -363,8 +363,8 @@ cd monitor/web && npm run build
 cd monitor/web && npm run dev     # 开发模式 (localhost:5173)
 
 # 启动顺序
-# 1. UniOpc Server (port 9400)
-# 2. Monitor Server (port 3000, 连接 UniOpc)
+# 1. Envoy Server (port 9400)
+# 2. Monitor Server (port 3000, 连接 Envoy)
 # 3. Monitor Web dev server (port 5173, proxy 到 3000)
 ```
 

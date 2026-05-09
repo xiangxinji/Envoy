@@ -26,4 +26,4 @@
 - **新增目录**: `monitor/server/`（后端）、`monitor/web/`（前端）
 - **新增依赖**: Vue 3、Vite、Tailwind CSS、@hono/node-server、hono
 - **删除目录**: `examples/monitor/`
-- **无破坏性变更**: 不影响 UniOpc 核心模块（src/）
+- **无破坏性变更**: 不影响 Envoy 核心模块（src/）

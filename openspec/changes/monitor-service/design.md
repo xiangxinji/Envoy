@@ -1,6 +1,6 @@
 ## Context
 
-UniOpc 是一个基于 WebSocket 的 Server/Client 通信框架，已有 `WatcherClient` 可作为外部观察者连接到 Server，接收初始 snapshot（所有客户端状态 + 能力列表）和实时事件（client:online/offline/registered）。当前缺少一个独立的 Monitor Service 来把这些信息通过 HTTP API 和 Web 仪表盘暴露出去。
+Envoy 是一个基于 WebSocket 的 Server/Client 通信框架，已有 `WatcherClient` 可作为外部观察者连接到 Server，接收初始 snapshot（所有客户端状态 + 能力列表）和实时事件（client:online/offline/registered）。当前缺少一个独立的 Monitor Service 来把这些信息通过 HTTP API 和 Web 仪表盘暴露出去。
 
 现有能力：
 - `WatcherClient`：接收 `snapshot`、`client:online`、`client:offline`、`client:registered` 事件
@@ -10,13 +10,13 @@ UniOpc 是一个基于 WebSocket 的 Server/Client 通信框架，已有 `Watche
 ## Goals / Non-Goals
 
 **Goals:**
-- 提供一个独立进程的 Monitor Service，零侵入 UniOpc 核心代码
+- 提供一个独立进程的 Monitor Service，零侵入 Envoy 核心代码
 - 通过 Hono HTTP 框架暴露 REST API 查询服务端和客户端状态
 - 提供一个内嵌 HTML 仪表盘页面，可视化展示状态信息
 - 自动通过 WatcherClient 维护内存中的最新状态
 
 **Non-Goals:**
-- 不修改 UniOpc 核心模块的任何代码
+- 不修改 Envoy 核心模块的任何代码
 - 不支持 WebSocket 推送到前端（首版用 API 轮询即可）
 - 不支持历史数据持久化或事件回放
 - 不支持认证/鉴权
@@ -27,7 +27,7 @@ UniOpc 是一个基于 WebSocket 的 Server/Client 通信框架，已有 `Watche
 
 **选择**：在 `examples/monitor/` 下创建独立的 package.json，通过 workspace 引用根项目。
 
-**理由**：Monitor 是 UniOpc 的使用示例，放在 examples 下语义清晰。独立 package.json 可以有自己的依赖（hono）而不污染主项目。
+**理由**：Monitor 是 Envoy 的使用示例，放在 examples 下语义清晰。独立 package.json 可以有自己的依赖（hono）而不污染主项目。
 
 **备选**：单独仓库。过于分离，不利于示例演示。
 

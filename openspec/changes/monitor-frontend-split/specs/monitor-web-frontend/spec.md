@@ -19,7 +19,7 @@ Monitor Web SHALL 通过 `useSSE()` composable 建立 SSE 连接，维护响应�
 - **THEN** `clients` 响应式数组中对应客户端被更新或新增
 
 ### Requirement: 连接状态指示器
-Monitor Web SHALL 在页面头部显示与 UniOpc Server 的连接状态。
+Monitor Web SHALL 在页面头部显示与 Envoy Server 的连接状态。
 
 #### Scenario: 已连接
 - **WHEN** SSE 连接处于 OPEN 状态

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { WatcherClient } from "uniopc/client";
-import type { WatcherSnapshot, WatcherClientEvents } from "uniopc/client";
+import { WatcherClient } from "envoy/client";
+import type { WatcherSnapshot, WatcherClientEvents } from "envoy/client";
 import { StateStore } from "./state-store.js";
 import { createApiApp } from "./api.js";
 import { getDashboardHtml } from "./dashboard.js";
@@ -11,14 +11,14 @@ type ClientOnlineState = WatcherClientEvents["client:online"] extends (s: infer 
 type ClientOfflineInfo = WatcherClientEvents["client:offline"] extends (s: infer S) => void ? S : never;
 type ClientRegisteredData = WatcherClientEvents["client:registered"] extends (s: infer S) => void ? S : never;
 
-const uniopcUrl = process.env.UNIOPC_URL ?? "ws://localhost:9400";
+const envoyUrl = process.env.ENVOY_URL ?? "ws://localhost:9400";
 const monitorPort = parseInt(process.env.MONITOR_PORT ?? "3000", 10);
 
 const store = new StateStore();
 
 const watcher = new WatcherClient({
   id: `monitor-${Date.now()}`,
-  servers: [uniopcUrl],
+  servers: [envoyUrl],
 });
 
 watcher.on("snapshot", (snapshot: unknown) => {
@@ -54,7 +54,7 @@ app.route("/", createApiApp(store));
 app.get("/", (c) => c.html(getDashboardHtml()));
 
 await watcher.connect();
-console.log(`[monitor] 已连接到 UniOpc Server: ${uniopcUrl}`);
+console.log(`[monitor] 已连接到 Envoy Server: ${envoyUrl}`);
 
 serve({ fetch: app.fetch, port: monitorPort }, (info) => {
   console.log(`[monitor] 仪表盘已启动: http://localhost:${info.port}`);

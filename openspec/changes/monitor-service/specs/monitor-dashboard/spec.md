@@ -36,12 +36,12 @@ Monitor Dashboard SHALL 在 `GET /` 路径返回一个完整的 HTML 页面，�
 - **THEN** 每 3 秒自动请求 /api/status、/api/clients、/api/capabilities 并更新页面展示内容
 
 ### Requirement: 连接状态指示
-仪表盘 SHALL 在页面中显示 Monitor 与 UniOpc Server 的连接状态。
+仪表盘 SHALL 在页面中显示 Monitor 与 Envoy Server 的连接状态。
 
 #### Scenario: 已连接状态
-- **WHEN** Monitor 已成功连接到 UniOpc Server 并收到 snapshot
+- **WHEN** Monitor 已成功连接到 Envoy Server 并收到 snapshot
 - **THEN** 页面显示绿色的"已连接"指示器
 
 #### Scenario: 未连接状态
-- **WHEN** Monitor 尚未连接到 UniOpc Server 或连接断开
+- **WHEN** Monitor 尚未连接到 Envoy Server 或连接断开
 - **THEN** 页面显示红色的"未连接"指示器

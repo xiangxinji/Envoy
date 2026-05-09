@@ -43,7 +43,7 @@ export interface ClientOptions {
 }
 
 /**
- * UniOpc 客户端主类
+ * Envoy 客户端主类
  * 负责连接服务端、注册能力、执行任务
  */
 export class Client extends EventEmitter<ClientEvents> {

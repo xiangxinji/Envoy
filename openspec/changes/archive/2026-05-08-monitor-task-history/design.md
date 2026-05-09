@@ -1,6 +1,6 @@
 ## Context
 
-UniOpc 是一个基于 WebSocket 的 Server/Client 通信框架，已有 WatcherClient 机制可以向监控端推送客户端状态和能力变更。当前 Snapshot 只包含 clients 和 capabilities，没有任务数据。Server 端的任务仅通过 `pendingTasks` Map 跟踪 Promise resolver，任务完成后即删除，没有持久化记录。
+Envoy 是一个基于 WebSocket 的 Server/Client 通信框架，已有 WatcherClient 机制可以向监控端推送客户端状态和能力变更。当前 Snapshot 只包含 clients 和 capabilities，没有任务数据。Server 端的任务仅通过 `pendingTasks` Map 跟踪 Promise resolver，任务完成后即删除，没有持久化记录。
 
 ## Goals / Non-Goals
 

@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { WatcherClient } from "uniopc/client";
-import type { WatcherSnapshot, WatcherClientEvents } from "uniopc/client";
-import type { TaskRecord } from "uniopc/core/task";
+import { WatcherClient } from "envoy/client";
+import type { WatcherSnapshot, WatcherClientEvents } from "envoy/client";
+import type { TaskRecord } from "envoy/core/task";
 import { StateStore } from "./state-store.js";
 import { createApiApp } from "./api.js";
 import { createSSEApp } from "./sse.js";
@@ -13,14 +13,14 @@ type ClientOnlineState = WatcherClientEvents["client:online"] extends (s: infer 
 type ClientOfflineInfo = WatcherClientEvents["client:offline"] extends (s: infer S) => void ? S : never;
 type ClientRegisteredData = WatcherClientEvents["client:registered"] extends (s: infer S) => void ? S : never;
 
-const uniopcUrl = process.env.UNIOPC_URL ?? "ws://localhost:9400";
+const envoyUrl = process.env.ENVOY_URL ?? "ws://localhost:9400";
 const monitorPort = parseInt(process.env.MONITOR_PORT ?? "3000", 10);
 
 const store = new StateStore();
 
 const watcher = new WatcherClient({
   id: `monitor-${Date.now()}`,
-  servers: [uniopcUrl],
+  servers: [envoyUrl],
 });
 
 watcher.on("snapshot", (snapshot: unknown) => {
@@ -65,7 +65,7 @@ app.route("/", createSSEApp(store));
 app.use("/*", serveStatic({ root: "../web/dist", rewriteRequestPath: (p) => p }));
 
 await watcher.connect();
-console.log(`[monitor] 已连接到 UniOpc Server: ${uniopcUrl}`);
+console.log(`[monitor] 已连接到 Envoy Server: ${envoyUrl}`);
 
 serve({ fetch: app.fetch, port: monitorPort }, (info) => {
   console.log(`[monitor] 服务已启动: http://localhost:${info.port}`);

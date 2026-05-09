@@ -1,6 +1,6 @@
 ## 1. 后端项目初始化
 
-- [x] 1.1 创建 `monitor/server/` 目录结构及 `package.json`（hono、@hono/node-server、uniopc workspace 引用）
+- [x] 1.1 创建 `monitor/server/` 目录结构及 `package.json`（hono、@hono/node-server、envoy workspace 引用）
 - [x] 1.2 创建 `monitor/server/tsconfig.json`
 - [x] 1.3 迁移 `examples/monitor/src/state-store.ts` 到 `monitor/server/src/state-store.ts`，增加 EventEmitter 能力用于 SSE 推送
 - [x] 1.4 迁移 `examples/monitor/src/api.ts` 到 `monitor/server/src/api.ts`

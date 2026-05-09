@@ -1,6 +1,6 @@
 ## Context
 
-UniOpc 已有成熟的 Server/Client 任务调度框架：Server 管理连接、能力注册和任务分发，Client 注册能力并执行任务。现有架构是"所有 Client 平等"模型，没有角色区分和知识共享机制。
+Envoy 已有成熟的 Server/Client 任务调度框架：Server 管理连接、能力注册和任务分发，Client 注册能力并执行任务。现有架构是"所有 Client 平等"模型，没有角色区分和知识共享机制。
 
 team-work 在此基础上构建团队协作语义层——三个角色：Team（Server 封装）、Leader（Client 封装）、Member（Client 封装），核心新增是文件系统级的 Markdown 资源管理和变更推送。
 

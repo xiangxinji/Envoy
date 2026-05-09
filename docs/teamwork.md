@@ -2,7 +2,7 @@
 
 ## 一、意图
 
-Teamwork 是 UniOpc 框架之上的**团队协作抽象层**。它为"一个编排者 + 多个执行者"的 AI Agent 团队提供角色定义和知识共享机制，使 Agent 之间能够通过共享的 Markdown 知识库实现去中心化的工作流协作。
+Teamwork 是 Envoy 框架之上的**团队协作抽象层**。它为"一个编排者 + 多个执行者"的 AI Agent 团队提供角色定义和知识共享机制，使 Agent 之间能够通过共享的 Markdown 知识库实现去中心化的工作流协作。
 
 核心理念：
 
@@ -34,7 +34,7 @@ Leader ──注册知识库──▶ Team (共享知识)
 
 ### Team（团队）
 
-封装 UniOpc Server，新增文件系统资源管理能力。
+封装 Envoy Server，新增文件系统资源管理能力。
 
 | 职责 | 说明 |
 |------|------|
@@ -46,7 +46,7 @@ Leader ──注册知识库──▶ Team (共享知识)
 
 ### Leader（领导者）
 
-封装 UniOpc Client，独占资源写入权限。
+封装 Envoy Client，独占资源写入权限。
 
 | 职责 | 说明 |
 |------|------|
@@ -58,7 +58,7 @@ Leader 不注册具体的执行能力（不实现具体任务），而是注册�
 
 ### Member（成员）
 
-封装 UniOpc Client，资源只读，可接收变更通知。
+封装 Envoy Client，资源只读，可接收变更通知。
 
 | 职责 | 说明 |
 |------|------|
@@ -114,7 +114,7 @@ Member 是实际的工作执行者。它注册具体能力、接收并执行任�
 
 ## 四、消息协议
 
-Teamwork 不修改 UniOpc 核心消息类型，通过现有 `message`（Client→Server）和 `notify`（Server→Client）的 subtype 机制扩展。
+Teamwork 不修改 Envoy 核心消息类型，通过现有 `message`（Client→Server）和 `notify`（Server→Client）的 subtype 机制扩展。
 
 ### 角色声明
 
@@ -204,7 +204,7 @@ Team ──notify/resource:query-result──▶ Member
 ### Team
 
 ```typescript
-import { Team } from "uniopc";
+import { Team } from "envoy";
 
 const team = new Team({
   port: 9400,                // 监听端口
@@ -230,7 +230,7 @@ team.innerServer;  // 访问底层 Server 实例
 ### Leader
 
 ```typescript
-import { Leader } from "uniopc";
+import { Leader } from "envoy";
 
 const leader = new Leader({
   id: "lead-1",
@@ -252,7 +252,7 @@ leader.register("capability-name", { execute: async (ctx) => { ... } });
 ### Member
 
 ```typescript
-import { Member } from "uniopc";
+import { Member } from "envoy";
 
 const member = new Member({
   id: "member-1",
