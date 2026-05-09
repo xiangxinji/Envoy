@@ -44,6 +44,7 @@ export class Team extends EventEmitter<TeamEvents> {
     });
     this.server.on("client:offline", ({ id }) => {
       this.roles.delete(id);
+      this.broadcastMembers();
     });
   }
 
@@ -55,6 +56,17 @@ export class Team extends EventEmitter<TeamEvents> {
     }
   }
 
+  private broadcastMembers(): void {
+    const members = [...this.roles.entries()].map(([id, role]) => ({
+      id,
+      role,
+      status: "online" as const,
+    }));
+    for (const [clientId] of this.roles) {
+      this.server.notify(clientId, "team:members", { members });
+    }
+  }
+
   private handleJoin(clientId: string, payload: TeamJoinPayload): void {
     this.roles.set(clientId, payload.role);
     if (payload.role === "leader") {
@@ -62,6 +74,7 @@ export class Team extends EventEmitter<TeamEvents> {
     } else {
       this.emit("member:joined", clientId);
     }
+    this.broadcastMembers();
   }
 
 
