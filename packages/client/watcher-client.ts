@@ -1,85 +1,52 @@
 import { Client } from "./client.js";
 import type { ClientOptions } from "./client.js";
-import { createMessage } from "../core/message.js";
+import type { Task } from "../core/task.js";
 import type { ClientState } from "../server/index.js";
-import type { CapabilityDefinition } from "../core/capability.js";
-import type { TaskRecord } from "../core/task.js";
-
-export interface WatcherSnapshot {
-  clients: ClientState[];
-  capabilities: CapabilityDefinition[];
-  tasks: TaskRecord[];
-}
 
 export interface WatcherClientEvents {
-  "snapshot": (snapshot: WatcherSnapshot) => void;
+  "connected": () => void;
+  "disconnected": () => void;
+  "task:created": (task: Task) => void;
+  "task:updated": (task: Task) => void;
+  "task:completed": (task: Task) => void;
+  "task:failed": (task: Task) => void;
   "client:online": (state: ClientState) => void;
   "client:offline": (info: { id: string }) => void;
-  "client:registered": (data: { clientId: string; capabilities: CapabilityDefinition[] }) => void;
-  "task:created": (task: TaskRecord) => void;
-  "task:updated": (task: TaskRecord) => void;
 }
 
 export class WatcherClient extends Client {
-  private snapshot: WatcherSnapshot | null = null;
-  private snapshotResolver: ((snapshot: WatcherSnapshot) => void) | null = null;
-
   constructor(options: ClientOptions) {
     super(options);
     this.setupWatcherHandlers();
   }
 
-  protected override sendRegister(): void {
-    const msg = createMessage("register", this.options.id, "server", {
-      watcher: true,
-      capabilities: [],
-    });
-    this.transport.send(msg);
-  }
-
   private setupWatcherHandlers(): void {
-    this.on("notify", (msg) => {
-      if (msg.subtype === "snapshot" && msg.payload) {
-        this.snapshot = msg.payload as WatcherSnapshot;
-        this.emit("snapshot", this.snapshot);
-        if (this.snapshotResolver) {
-          this.snapshotResolver(this.snapshot);
-          this.snapshotResolver = null;
-        }
+    this.on("task", (task: Task) => {
+      switch (task.status) {
+        case "pending":
+          this.emit("task:created" as any, task);
+          break;
+        case "running":
+          this.emit("task:updated" as any, task);
+          break;
+        case "completed":
+          this.emit("task:completed" as any, task);
+          break;
+        case "failed":
+          this.emit("task:failed" as any, task);
+          break;
       }
     });
 
-    this.on("notify:client:online", (state) => {
-      this.emit("client:online", state as ClientState);
-    });
-
-    this.on("notify:client:offline", (info) => {
-      this.emit("client:offline", info as { id: string });
-    });
-
-    this.on("notify:client:registered", (data) => {
-      this.emit("client:registered", data as { clientId: string; capabilities: CapabilityDefinition[] });
-    });
-
-    this.on("notify:task:created", (task) => {
-      this.emit("task:created", task as TaskRecord);
-    });
-
-    this.on("notify:task:updated", (task) => {
-      this.emit("task:updated", task as TaskRecord);
-    });
-  }
-
-  getSnapshot(): WatcherSnapshot | null {
-    return this.snapshot;
-  }
-
-  waitForSnapshot(): Promise<WatcherSnapshot> {
-    if (this.snapshot) {
-      return Promise.resolve(this.snapshot);
-    }
-    return new Promise((resolve) => {
-      this.snapshotResolver = resolve;
+    this.on("message", (msg) => {
+      if (msg.type === "notify") {
+        const subtype = (msg as any).subtype;
+        if (subtype === "client:online") {
+          this.emit("client:online" as any, (msg as any).payload as ClientState);
+        } else if (subtype === "client:offline") {
+          this.emit("client:offline" as any, (msg as any).payload as { id: string });
+        }
+      }
     });
   }
 }

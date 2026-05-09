@@ -1,13 +1,10 @@
 export type MessageType =
-  | "register"
-  | "register_ack"
+  | "submit"
+  | "dispatch"
+  | "result"
+  | "task"
   | "heartbeat"
   | "heartbeat_ack"
-  | "execute"
-  | "execute_result"
-  | "execute_progress"
-  | "execute_request"
-  | "execute_abort"
   | "notify"
   | "message"
   | "error";
@@ -42,11 +39,6 @@ export function createMessage<T>(
     payload,
     timestamp: Date.now(),
   };
-}
-
-export interface RegisterPayload {
-  watcher?: boolean;
-  capabilities: unknown[];
 }
 
 export function serializeMessage(msg: Message): string {

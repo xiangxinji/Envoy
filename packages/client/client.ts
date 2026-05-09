@@ -1,67 +1,38 @@
 import { EventEmitter } from "../core/event-emitter.js";
 import { createMessage } from "../core/message.js";
 import type { Message } from "../core/message.js";
-import type { TaskResult, TaskProgress, TaskInstance } from "../core/task.js";
+import type { Task, SubmitOptions } from "../core/task.js";
 import { ClientTransport } from "./transport.js";
 import { Heartbeat } from "./heartbeat.js";
-import { TaskQueue } from "./task-queue.js";
-import { TaskExecutor } from "./task-executor.js";
-import { type CapabilityRegistration, toDefinition } from "./capability.js";
 
-/** 客户端事件类型定义 */
+export type TaskHandler = (task: Task) => Promise<unknown>;
+
 export type ClientEvents = {
-  /** 连接成功事件 */
   "connected": () => void;
-  /** 断开连接事件 */
   "disconnected": () => void;
-  /** 重连尝试事件 */
   "reconnecting": (attempt: number) => void;
-  /** 能力注册成功事件 */
-  "registered": () => void;
-  /** 收到通知事件 */
+  "task": (task: Task) => void;
   "notify": (msg: Message) => void;
-  /** 收到消息事件 */
   "message": (msg: Message) => void;
-  /** 错误事件 */
   "error": (payload: unknown) => void;
 };
 
-/** 客户端配置选项 */
 export interface ClientOptions {
-  /** 客户端唯一标识 */
   id: string;
-  /** 服务端地址列表 */
   servers: string[];
-  /** 心跳间隔（毫秒），默认 10000 */
   heartbeatInterval?: number;
-  /** 是否自动重连，默认 true */
   reconnect?: boolean;
-  /** 重连间隔（毫秒），默认 3000 */
   reconnectInterval?: number;
-  /** 最大重连尝试次数，默认 10 */
   maxReconnectAttempts?: number;
 }
 
-/**
- * Envoy 客户端主类
- * 负责连接服务端、注册能力、执行任务
- */
 export class Client extends EventEmitter<ClientEvents> {
   protected transport: ClientTransport;
   private heartbeat: Heartbeat;
-  private queue: TaskQueue;
-  private executor: TaskExecutor;
-  private capabilities = new Map<string, CapabilityRegistration>();
-  private taskCounter = 0;
+  private handler: TaskHandler | null = null;
+  private queue: Task[] = [];
+  private running: Task | null = null;
 
-  /** 服务端任务结果跟踪表 */
-  private pendingResults = new Map<string, {
-    resolve: (result: TaskResult) => void;
-    reject: (err: Error) => void;
-    timer: ReturnType<typeof setTimeout>;
-  }>();
-
-  /** 创建客户端实例 */
   constructor(protected options: ClientOptions) {
     super();
 
@@ -72,100 +43,51 @@ export class Client extends EventEmitter<ClientEvents> {
       maxReconnectAttempts: options.maxReconnectAttempts,
     });
 
-    this.queue = new TaskQueue();
     this.heartbeat = new Heartbeat(
       options.id,
       (msg) => this.transport.send(msg),
       () => ({
-        queueLength: this.queue.queueLength,
-        running: this.queue.currentTask
-          ? {
-              taskId: this.queue.currentTask.id,
-              taskName: this.queue.currentTask.name,
-              progress: this.queue.currentTask.progress?.progress,
-            }
-          : undefined,
-        uptime: 0, // will be overwritten by heartbeat
+        queueLength: this.queue.length,
+        running: this.running !== null,
+        uptime: 0,
       }),
       options.heartbeatInterval ?? 10000
-    );
-
-    this.executor = new TaskExecutor(
-      this.queue,
-      this.capabilities,
-      (taskId, result) => this.handleTaskResult(taskId, result),
-      (taskId, progress) => this.handleTaskProgress(taskId, progress),
-      (taskName, params) => this.executeOnServer(taskName, params),
     );
 
     this.setupTransport();
   }
 
-  // --- 公共 API ---
-
-  /** 注册能力到服务端 */
-  register(
-    name: string,
-    options: {
-      description?: string;
-      params?: Record<string, import("../core/capability.js").ParamDef>;
-      mode?: "queue" | "preemptive";
-      priority?: number;
-      timeout?: number;
-      maxRetries?: number;
-      retryDelay?: number;
-      execute: import("./capability.js").AsyncExecuteFn | import("./capability.js").GeneratorExecuteFn;
-    }
-  ): void {
-    const reg: CapabilityRegistration = {
-      name,
-      description: options.description ?? name,
-      params: options.params ?? {},
-      mode: options.mode ?? "queue",
-      priority: options.priority ?? 0,
-      timeout: options.timeout,
-      maxRetries: options.maxRetries,
-      retryDelay: options.retryDelay,
-      execute: options.execute,
-    };
-    this.capabilities.set(name, reg);
+  doing(fn: TaskHandler): void {
+    this.handler = fn;
   }
 
-  /** 连接到服务端 */
   async connect(): Promise<void> {
     await this.transport.connect();
     this.heartbeat.start();
   }
 
-  /** 断开与服务端的连接 */
   disconnect(): void {
     this.heartbeat.stop();
     this.transport.disconnect();
   }
 
-  /** 请求服务端执行任务 */
-  async execute(taskName: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    return this.executeOnServer(taskName, params);
+  submit(options: SubmitOptions): void {
+    const msg = createMessage("submit", this.options.id, "server", options);
+    this.transport.send(msg);
   }
 
-  /** 向服务端发送消息 */
   send(subtype: string, payload: unknown): void {
     const msg = createMessage("message", this.options.id, "server", payload, { subtype });
     this.transport.send(msg);
   }
 
-  /** 向指定客户端发送消息（fire-and-forget） */
   sendTo(targetId: string, subtype: string, payload: unknown): void {
     const msg = createMessage("message", this.options.id, targetId, payload, { subtype });
     this.transport.send(msg);
   }
 
-  // --- 内部方法 ---
-
-  /** 设置传输层事件处理器 */
   private setupTransport(): void {
     this.transport.on("open", () => {
-      this.sendRegister();
       this.emit("connected");
     });
 
@@ -183,36 +105,21 @@ export class Client extends EventEmitter<ClientEvents> {
     });
   }
 
-  /** 发送能力注册消息 */
-  protected sendRegister(): void {
-    const defs = [...this.capabilities.values()].map(toDefinition);
-    const msg = createMessage("register", this.options.id, "server", { capabilities: defs });
-    this.transport.send(msg);
-  }
-
-  /** 处理收到的消息，根据类型分发到对应处理器 */
   private handleMessage(msg: Message): void {
     switch (msg.type) {
-      case "register_ack":
-        this.emit("registered");
-        break;
       case "heartbeat_ack":
         break;
-      case "execute":
-        this.handleExecute(msg);
+      case "dispatch":
+        this.handleDispatch(msg);
         break;
-      case "execute_result":
-        this.handleExecuteResult(msg);
-        break;
-      case "execute_abort":
-        this.handleExecuteAbort(msg);
+      case "task":
+        this.emit("task", msg.payload as Task);
         break;
       case "notify":
-        this.emit("notify:" + msg.subtype, msg.payload);
         this.emit("notify", msg);
+        this.emit("message", msg);
         break;
       case "message":
-        this.emit("message:" + msg.subtype, msg.payload);
         this.emit("message", msg);
         break;
       case "error":
@@ -221,116 +128,42 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
-  /** 处理服务端下发的任务执行指令 */
-  private handleExecute(msg: Message): void {
-    const payload = msg.payload as {
-      taskId: string;
-      name: string;
-      params: Record<string, unknown>;
-      mode: "queue" | "preemptive";
-      priority: number;
-      timeout?: number;
-    };
-
-    const cap = this.capabilities.get(payload.name);
-    if (!cap) {
-      const result: TaskResult = {
-        success: false,
-        error: `Unknown capability: ${payload.name}`,
-        duration: 0,
-      };
-      const reply = createMessage("execute_result", this.options.id, "server", result, {
-        replyTo: payload.taskId,
-      });
-      this.transport.send(reply);
-      return;
-    }
-
-    const task: TaskInstance = {
-      id: payload.taskId,
-      name: payload.name,
-      params: payload.params,
-      mode: payload.mode,
-      priority: payload.priority,
-      status: "pending",
-      timeout: payload.timeout,
-      maxRetries: cap.maxRetries,
-      retryDelay: cap.retryDelay,
-      retryCount: 0,
-      createdAt: Date.now(),
-    };
-
-    this.queue.enqueue(task);
-    this.executor.processNext();
+  private handleDispatch(msg: Message): void {
+    const task = msg.payload as Task;
+    this.queue.push(task);
+    this.processNext();
   }
 
-  /** 处理任务执行结果，发送回服务端 */
-  private handleTaskResult(taskId: string, result: TaskResult): void {
-    const msg = createMessage("execute_result", this.options.id, "server", result, {
-      replyTo: taskId,
+  private async processNext(): Promise<void> {
+    if (this.running || !this.handler || this.queue.length === 0) return;
+
+    this.running = this.queue.shift()!;
+    try {
+      const result = await this.handler(this.running);
+      this.sendResult(this.running.id, true, result);
+    } catch (err) {
+      this.sendResult(
+        this.running.id,
+        false,
+        undefined,
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+    this.running = null;
+    this.processNext();
+  }
+
+  private sendResult(taskId: string, success: boolean, data?: unknown, error?: string): void {
+    const msg = createMessage("result", this.options.id, "server", {
+      taskId,
+      success,
+      data,
+      error,
     });
     try {
       this.transport.send(msg);
     } catch {
       // transport disconnected, result lost
     }
-    // process next task in queue
-    this.executor.processNext();
-  }
-
-  /** 处理任务执行进度更新 */
-  private handleTaskProgress(taskId: string, progress: TaskProgress): void {
-    const msg = createMessage("execute_progress", this.options.id, "server", progress);
-    try {
-      this.transport.send(msg);
-    } catch {
-      // transport disconnected
-    }
-  }
-
-  /** 处理服务端返回的任务执行结果 */
-  private handleExecuteResult(msg: Message): void {
-    const replyTo = msg.replyTo;
-    if (!replyTo) return;
-    const pending = this.pendingResults.get(replyTo);
-    if (!pending) return;
-    clearTimeout(pending.timer);
-    this.pendingResults.delete(replyTo);
-    pending.resolve(msg.payload as TaskResult);
-  }
-
-  /** 处理任务中止指令 */
-  private handleExecuteAbort(msg: Message): void {
-    const { taskId } = msg.payload as { taskId: string };
-    this.executor.abort(taskId);
-  }
-
-  /** 向服务端发起任务执行请求 */
-  private async executeOnServer(taskName: string, params: Record<string, unknown>): Promise<unknown> {
-    const requestId = `req-${Date.now()}-${++this.taskCounter}`;
-    const msg = createMessage("execute_request", this.options.id, "server", {
-      taskName,
-      params,
-    });
-
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingResults.delete(requestId);
-        reject(new Error(`Execute request ${requestId} timed out`));
-      }, 60000);
-
-      this.pendingResults.set(requestId, {
-        resolve: (result) => {
-          if (result.success) resolve(result.data);
-          else reject(new Error(result.error));
-        },
-        reject,
-        timer,
-      });
-
-      // use msg.id as the requestId for matching
-      msg.id = requestId;
-      this.transport.send(msg);
-    });
   }
 }

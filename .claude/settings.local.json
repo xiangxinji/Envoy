@@ -21,7 +21,8 @@
       "Bash(openspec *)",
       "Bash(npm create *)",
       "Bash(npx vite *)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(git *)"
     ]
   }
 }
