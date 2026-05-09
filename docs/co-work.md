@@ -280,7 +280,7 @@ member.register("capability-name", { execute: async (ctx) => { ... } });
 ## 七、目录结构
 
 ```
-src/teamwork/
+co-work/
 ├── types.ts     # 类型定义（ResourceChangedEvent, TeamOptions 等）
 ├── team.ts      # Team 类 — Server 封装 + 文件系统资源管理 + 角色权限
 ├── leader.ts    # Leader 类 — Client 封装 + 资源写入

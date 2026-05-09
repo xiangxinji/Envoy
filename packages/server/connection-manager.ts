@@ -1,4 +1,4 @@
-import { EventEmitter } from "../core/event-emitter.js";
+import { EventEmitter } from "../../packages/core/event-emitter.js";
 
 /** 客户端状态信息 */
 export interface ClientState {

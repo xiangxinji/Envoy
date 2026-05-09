@@ -1,9 +1,9 @@
-import { EventEmitter } from "../core/event-emitter.js";
-import { createMessage } from "../core/message.js";
-import type { Message } from "../core/message.js";
-import type { TaskResult, TaskProgress, TaskRecord, TaskHistoryEntry } from "../core/task.js";
-import type { CapabilityDefinition } from "../core/capability.js";
-import type { RegisterPayload } from "../core/message.js";
+import { EventEmitter } from "../../packages/core/event-emitter.js";
+import { createMessage } from "../../packages/core/message.js";
+import type { Message } from "../../packages/core/message.js";
+import type { TaskResult, TaskProgress, TaskRecord, TaskHistoryEntry } from "../../packages/core/task.js";
+import type { CapabilityDefinition } from "../../packages/core/capability.js";
+import type { RegisterPayload } from "../../packages/core/message.js";
 import { ServerTransport } from "./transport.js";
 import { ConnectionManager } from "./connection-manager.js";
 import type { ClientState } from "./connection-manager.js";

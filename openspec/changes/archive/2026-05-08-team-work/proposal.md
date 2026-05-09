@@ -4,7 +4,7 @@ Envoy 目前提供了基础的 Server/Client 任务调度能力，但没有"团�
 
 ## What Changes
 
-- 新增 `src/teamwork/` 目录，包含 Team、Leader、Member 三个类，由 `src/index.ts` 统一导出
+- 新增 `co-work/` 目录，包含 Team、Leader、Member 三个类，由 `src/index.ts` 统一导出
 - Team 封装 Server，新增文件系统资源管理（Markdown 文件的 CRUD + 变更推送）
 - Leader 封装 Client，具备向 Team 注册/更新/删除资源的唯一权限
 - Member 封装 Client，可查询 Team 资源，接收资源变更通知
@@ -24,7 +24,7 @@ Envoy 目前提供了基础的 Server/Client 任务调度能力，但没有"团�
 
 ## Impact
 
-- 新增 `src/teamwork/` 目录（约 4 个文件），由 `src/index.ts` 导出，不修改现有 Server/Client 核心
+- 新增 `co-work/` 目录（约 4 个文件），由 `src/index.ts` 导出，不修改现有 Server/Client 核心
 - 需要在现有消息协议中新增资源操作相关的消息类型（通过 notify 的 subtype 扩展）
 - 资源以文件形式存储在 Team 进程的本地磁盘上
 - Leader 和 Member 之间通过 Team 中转实现知识共享

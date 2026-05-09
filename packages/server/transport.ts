@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
-import { EventEmitter } from "../core/event-emitter.js";
-import { type Message, serializeMessage, deserializeMessage } from "../core/message.js";
-import { ConnectionError } from "../core/errors.js";
+import { EventEmitter } from "../../packages/core/event-emitter.js";
+import { type Message, serializeMessage, deserializeMessage } from "../../packages/core/message.js";
+import { ConnectionError } from "../../packages/core/errors.js";
 
 /** 服务端传输层配置选项 */
 export interface ServerTransportOptions {

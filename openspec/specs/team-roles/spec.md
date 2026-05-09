@@ -56,8 +56,8 @@ Team SHALL only allow Leader-role clients to register, update, and delete resour
 - **WHEN** a Member sends a `resource:delete` notify
 - **THEN** Team SHALL reject the operation and return an error
 
-### Requirement: All three classes SHALL be exported from src/teamwork
-The `src/teamwork/` module SHALL export Team, Leader, Member, and their option types. These SHALL be re-exported from `src/index.ts`.
+### Requirement: All three classes SHALL be exported from co-work
+The `co-work/` module SHALL export Team, Leader, Member, and their option types. These SHALL be re-exported from `src/index.ts`.
 
 #### Scenario: Import from envoy
 - **WHEN** a consumer imports from `envoy`
