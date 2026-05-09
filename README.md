@@ -1,4 +1,4 @@
-# UniOpc
+# Envoy
 
 基于 WebSocket 的 Server/Client 通信框架，支持任务调度、能力注册、心跳检测、客户端间通信等功能。
 
@@ -16,7 +16,7 @@
 ## 安装
 
 ```bash
-npm install uniopc
+npm install envoy
 ```
 
 ## 快速开始
@@ -24,7 +24,7 @@ npm install uniopc
 ### 服务端
 
 ```typescript
-import { Server } from "uniopc/server";
+import { Server } from "envoy/server";
 
 const server = new Server({ port: 9000 });
 
@@ -43,7 +43,7 @@ console.log("服务端已启动");
 ### 客户端
 
 ```typescript
-import { Client } from "uniopc/client";
+import { Client } from "envoy/client";
 
 const client = new Client({
   id: "worker-1",
@@ -145,6 +145,7 @@ interface ClientOptions {
 | `disconnect()` | 断开连接 |
 | `execute(taskName, params?): Promise<unknown>` | 请求服务端执行任务 |
 | `send(subtype, payload)` | 向服务端发送消息 |
+| `sendTo(targetId, subtype, payload)` | 向指定客户端发送消息（fire-and-forget） |
 
 #### 事件
 
@@ -157,6 +158,7 @@ interface ClientOptions {
 | `notify` | `Message` | 收到通知 |
 | `notify:<subtype>` | `payload` | 收到特定类型通知 |
 | `message` | `Message` | 收到消息 |
+| `message:<subtype>` | `payload` | 收到特定类型消息（含客户端间消息） |
 | `error` | `Error` | 错误 |
 
 ### WatcherClient
@@ -164,7 +166,7 @@ interface ClientOptions {
 WatcherClient 是观察者客户端，用于监控服务端状态变更（如客户端上下线、能力注册等）。连接后会自动收到服务端的初始快照。
 
 ```typescript
-import { WatcherClient } from "uniopc/client";
+import { WatcherClient } from "envoy/client";
 
 const watcher = new WatcherClient({
   id: "watcher-1",
@@ -244,7 +246,7 @@ interface TaskContext {
 
 | 类 | 错误码 | 说明 |
 |---|---|---|
-| `UniOpcError` | 自定义 | 基类 |
+| `EnvoyError` | 自定义 | 基类 |
 | `ConnectionError` | `CONNECTION_ERROR` | 连接错误 |
 | `TimeoutError` | `TIMEOUT` | 任务超时 |
 | `TaskError` | `TASK_ERROR` | 任务执行错误 |

@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Team SHALL wrap Server with resource management
-Team SHALL extend or encapsulate a UniOpc Server instance. Team SHALL accept the same options as Server plus an optional `resourceRoot` path (default: `resources/`). Team SHALL handle resource-related notify messages from Leader and Member.
+Team SHALL extend or encapsulate a Envoy Server instance. Team SHALL accept the same options as Server plus an optional `resourceRoot` path (default: `resources/`). Team SHALL handle resource-related notify messages from Leader and Member.
 
 #### Scenario: Team creation with default resource root
 - **WHEN** a Team is created with `{ port: 9400 }`
@@ -12,7 +12,7 @@ Team SHALL extend or encapsulate a UniOpc Server instance. Team SHALL accept the
 - **THEN** Team SHALL use `./data/knowledge` as the resource root directory
 
 ### Requirement: Leader SHALL extend Client with resource write capability
-Leader SHALL extend or encapsulate a UniOpc Client. Leader SHALL connect to Team and register with `role: "leader"`. Leader SHALL provide methods to register, update, and delete resources.
+Leader SHALL extend or encapsulate a Envoy Client. Leader SHALL connect to Team and register with `role: "leader"`. Leader SHALL provide methods to register, update, and delete resources.
 
 #### Scenario: Leader connects to Team
 - **WHEN** Leader connects to Team
@@ -27,7 +27,7 @@ Leader SHALL extend or encapsulate a UniOpc Client. Leader SHALL connect to Team
 - **THEN** Leader SHALL send a `resource:delete` notify to Team with the path
 
 ### Requirement: Member SHALL extend Client with resource read capability
-Member SHALL extend or encapsulate a UniOpc Client. Member SHALL connect to Team and register with `role: "member"`. Member SHALL provide methods to query resource list and content. Member SHALL listen for `resource:changed` notifications.
+Member SHALL extend or encapsulate a Envoy Client. Member SHALL connect to Team and register with `role: "member"`. Member SHALL provide methods to query resource list and content. Member SHALL listen for `resource:changed` notifications.
 
 #### Scenario: Member connects to Team
 - **WHEN** Member connects to Team
@@ -56,9 +56,9 @@ Team SHALL only allow Leader-role clients to register, update, and delete resour
 - **WHEN** a Member sends a `resource:delete` notify
 - **THEN** Team SHALL reject the operation and return an error
 
-### Requirement: All three classes SHALL be exported from src/teamwork
-The `src/teamwork/` module SHALL export Team, Leader, Member, and their option types. These SHALL be re-exported from `src/index.ts`.
+### Requirement: All three classes SHALL be exported from co-work
+The `co-work/` module SHALL export Team, Leader, Member, and their option types. These SHALL be re-exported from `src/index.ts`.
 
-#### Scenario: Import from uniopc
-- **WHEN** a consumer imports from `uniopc`
+#### Scenario: Import from envoy
+- **WHEN** a consumer imports from `envoy`
 - **THEN** Team, Leader, Member, TeamOptions, LeaderOptions, MemberOptions SHALL be available

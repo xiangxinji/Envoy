@@ -1,4 +1,4 @@
-# UniOpc Core Framework
+# Envoy Core Framework
 
 ## Problem
 
@@ -6,10 +6,10 @@
 
 ## Solution
 
-构建 UniOpc —— 一个基于 WebSocket 的 Client/Server 任务调度框架，灵感来源于工业产线的中控调度模式（中心化控制，去中心化执行）。单包发布，通过 subpath exports 区分 server 和 client：
+构建 Envoy —— 一个基于 WebSocket 的 Client/Server 任务调度框架，灵感来源于工业产线的中控调度模式（中心化控制，去中心化执行）。单包发布，通过 subpath exports 区分 server 和 client：
 
-- **uniopc/server**: 管理 Client 连接、维护能力注册表、调度任务、路由消息
-- **uniopc/client**: 连接 Server、注册能力、执行任务、管理本地队列
+- **envoy/server**: 管理 Client 连接、维护能力注册表、调度任务、路由消息
+- **envoy/client**: 连接 Server、注册能力、执行任务、管理本地队列
 - 内部共享层（core）: 消息协议、任务定义、能力定义、优先级队列、事件系统
 
 核心交互模式：Client 注册能力 → Server 感知状态 → 自动派发任务 → 结果回传。
@@ -43,7 +43,7 @@
 
 ## Scope
 
-- @uniopc/core 共享层（消息协议、任务定义、能力定义、优先级队列、事件系统）
+- @envoy/core 共享层（消息协议、任务定义、能力定义、优先级队列、事件系统）
 - WebSocket 传输层封装
 - 心跳保活 + 携带状态信息（队列长度、当前任务、进度）
 - 能力注册与查询
@@ -60,9 +60,9 @@
 ## Package Structure
 
 ```
-uniopc (单包，subpath exports)
+envoy (单包，subpath exports)
 
-uniopc/
+envoy/
 ├── src/
 │   ├── core/              # 内部共享，不直接暴露
 │   │   ├── index.ts
@@ -73,7 +73,7 @@ uniopc/
 │   │   ├── event-emitter.ts
 │   │   └── errors.ts
 │   │
-│   ├── server/            # import { Server } from "uniopc/server"
+│   ├── server/            # import { Server } from "envoy/server"
 │   │   ├── index.ts
 │   │   ├── server.ts
 │   │   ├── connection-manager.ts
@@ -81,7 +81,7 @@ uniopc/
 │   │   ├── task-dispatcher.ts
 │   │   └── message-router.ts
 │   │
-│   ├── client/            # import { Client } from "uniopc/client"
+│   ├── client/            # import { Client } from "envoy/client"
 │   │   ├── index.ts
 │   │   ├── client.ts
 │   │   ├── heartbeat.ts

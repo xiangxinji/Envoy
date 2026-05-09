@@ -43,7 +43,7 @@ export interface ClientOptions {
 }
 
 /**
- * UniOpc 客户端主类
+ * Envoy 客户端主类
  * 负责连接服务端、注册能力、执行任务
  */
 export class Client extends EventEmitter<ClientEvents> {
@@ -151,6 +151,12 @@ export class Client extends EventEmitter<ClientEvents> {
   /** 向服务端发送消息 */
   send(subtype: string, payload: unknown): void {
     const msg = createMessage("message", this.options.id, "server", payload, { subtype });
+    this.transport.send(msg);
+  }
+
+  /** 向指定客户端发送消息（fire-and-forget） */
+  sendTo(targetId: string, subtype: string, payload: unknown): void {
+    const msg = createMessage("message", this.options.id, targetId, payload, { subtype });
     this.transport.send(msg);
   }
 

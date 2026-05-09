@@ -40,7 +40,7 @@ export interface ServerOptions {
 }
 
 /**
- * UniOpc 服务端主类
+ * Envoy 服务端主类
  * 管理客户端连接、能力注册、任务调度等功能
  */
 export class Server extends EventEmitter<ServerEvents> {
@@ -247,6 +247,9 @@ export class Server extends EventEmitter<ServerEvents> {
         break;
       case "notify":
       case "message":
+        if (msg.to !== "server") {
+          this.transport.send(msg.to, msg);
+        }
         this.emit("message", clientId, msg);
         break;
       default:

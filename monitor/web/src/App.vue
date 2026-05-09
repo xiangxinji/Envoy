@@ -9,7 +9,7 @@ const { clients, capabilities, tasks, status, connected } = useSSE()
 <template>
   <div class="min-h-screen bg-slate-900 text-slate-200">
     <header class="border-b border-slate-700 bg-slate-800 px-6 py-4 flex items-center justify-between">
-      <h1 class="text-xl font-semibold text-slate-100">UniOpc Monitor</h1>
+      <h1 class="text-xl font-semibold text-slate-100">Envoy Monitor</h1>
       <ConnectionBadge :connected="connected" />
     </header>
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-UniOpc 是一个基于 WebSocket 的 Server/Client 通信框架，支持任务调度、能力注册、心跳检测等功能。
+Envoy 是一个基于 WebSocket 的 Server/Client 通信框架，支持任务调度、能力注册、心跳检测等功能。
 
 ## Tech Stack
 

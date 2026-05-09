@@ -1,6 +1,6 @@
-import { Server } from "../src/server/index.js";
-import type { ClientState } from "../src/server/index.js";
-import { Client } from "../src/client/index.js";
+import { Server } from "../packages/server/index.js";
+import type { ClientState } from "../packages/server/index.js";
+import { Client } from "../packages/client/index.js";
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

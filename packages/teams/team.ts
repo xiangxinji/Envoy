@@ -53,6 +53,13 @@ export class Team extends EventEmitter<TeamEvents> {
   private setupHandlers(): void {
     this.server.on("message", (clientId, msg) => {
       if (msg.type !== "message") return;
+
+      // 转发非 server 目标的 message 给目标 Client
+      if (msg.to !== "server") {
+        this.server.notify(msg.to, msg.subtype ?? "", msg.payload);
+        return;
+      }
+
       this.handleTeamMessage(clientId, msg);
     });
     this.server.on("client:offline", ({ id }) => {

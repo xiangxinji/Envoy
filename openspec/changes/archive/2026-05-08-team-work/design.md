@@ -1,6 +1,6 @@
 ## Context
 
-UniOpc 已有成熟的 Server/Client 任务调度框架：Server 管理连接、能力注册和任务分发，Client 注册能力并执行任务。现有架构是"所有 Client 平等"模型，没有角色区分和知识共享机制。
+Envoy 已有成熟的 Server/Client 任务调度框架：Server 管理连接、能力注册和任务分发，Client 注册能力并执行任务。现有架构是"所有 Client 平等"模型，没有角色区分和知识共享机制。
 
 team-work 在此基础上构建团队协作语义层——三个角色：Team（Server 封装）、Leader（Client 封装）、Member（Client 封装），核心新增是文件系统级的 Markdown 资源管理和变更推送。
 
@@ -8,7 +8,7 @@ team-work 在此基础上构建团队协作语义层——三个角色：Team（
 
 **Goals:**
 
-- 提供 Team/Leader/Member 三层抽象，代码放在 `src/teamwork/` 下，由 `src/index.ts` 导出
+- 提供 Team/Leader/Member 三层抽象，代码放在 `co-work/` 下，由 `src/index.ts` 导出
 - Team 端支持 Markdown 文件的增删改查，持久化到磁盘
 - Leader 独占资源的写入权限（增、删、改）
 - Member 可查询资源，并实时接收资源变更通知
@@ -20,7 +20,7 @@ team-work 在此基础上构建团队协作语义层——三个角色：Team（
 - 不实现工作流编排引擎（未来由 LLM + 知识库驱动）
 - 不实现资源版本控制或 diff 追踪
 - 不实现资源的分片、分页或全文搜索
-- 不修改现有 Server/Client 核心代码（仅新增 `src/teamwork/` 模块和 `src/index.ts` 导出）
+- 不修改现有 Server/Client 核心代码（仅新增 `co-work/` 模块和 `src/index.ts` 导出）
 - 不实现 Leader 的鉴权机制（假设 Team 内信任所有连接）
 
 ## Decisions

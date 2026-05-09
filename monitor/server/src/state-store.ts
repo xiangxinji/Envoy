@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
-import type { WatcherSnapshot } from "uniopc/client";
-import type { TaskRecord } from "uniopc/core/task";
+import type { WatcherSnapshot } from "envoy/client";
+import type { TaskRecord } from "envoy/core/task";
 
 type ClientState = WatcherSnapshot["clients"][number];
 type CapabilityDefinition = WatcherSnapshot["capabilities"][number];
