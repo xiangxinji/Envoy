@@ -1,6 +1,6 @@
-import type { Message } from "../../packages/core/message.js";
-import { createMessage } from "../../packages/core/message.js";
-import type { TaskResult } from "../../packages/core/task.js";
+import type { Message } from "../core/message.js";
+import { createMessage } from "../core/message.js";
+import type { TaskResult } from "../core/task.js";
 import type { ConnectionManager } from "./connection-manager.js";
 import type { CapabilityRegistry } from "./capability-registry.js";
 

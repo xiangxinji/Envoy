@@ -1,4 +1,4 @@
-import type { CapabilityDefinition } from "../../packages/core/capability.js";
+import type { CapabilityDefinition } from "../core/capability.js";
 
 /**
  * 能力注册表

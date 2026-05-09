@@ -1,4 +1,4 @@
-import { Client } from "../src/client/client.js";
+import { Client } from "../client/client.js";
 import type { Message } from "../core/message.js";
 import type { ResourceChangedEvent, ResourceQueryResult, MemberOptions } from "./types.js";
 

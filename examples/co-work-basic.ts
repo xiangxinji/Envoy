@@ -1,6 +1,6 @@
-import { Team } from "../co-work/index.js";
-import { Leader } from "../co-work/index.js";
-import { Member } from "../co-work/index.js";
+import { Team } from "../packages/teams/index.js";
+import { Leader } from "../packages/teams/index.js";
+import { Member } from "../packages/teams/index.js";
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -7,7 +7,7 @@
     "./server": "./dist/server/index.js",
     "./client": "./dist/client/index.js",
     "./core/*": "./dist/core/*.js",
-    "./co-work": "./dist/co-work/index.js"
+    "./co-work": "./dist/teams/index.js"
   },
   "scripts": {
     "build": "tsc",

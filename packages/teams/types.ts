@@ -1,4 +1,4 @@
-import type { ClientOptions } from "../src/client/index.js";
+import type { ClientOptions } from "../client/index.js";
 
 /** 资源变更事件 */
 export interface ResourceChangedEvent {

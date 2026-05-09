@@ -1,5 +1,5 @@
-import { Server } from "../src/server/server.js";
-import type { ServerOptions } from "../src/server/server.js";
+import { Server } from "../server/server.js";
+import type { ServerOptions } from "../server/server.js";
 import { EventEmitter } from "../core/event-emitter.js";
 import type { Message } from "../core/message.js";
 import fs from "node:fs";

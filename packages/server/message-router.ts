@@ -1,4 +1,4 @@
-import type { Message } from "../../packages/core/message.js";
+import type { Message } from "../core/message.js";
 
 /** 消息发送函数类型 */
 export type SendFn = (clientId: string, message: Message) => void;
