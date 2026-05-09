@@ -17,6 +17,7 @@ export interface WatcherClientEvents {
 export class WatcherClient extends Client {
   constructor(options: ClientOptions) {
     super(options);
+    (this.transport as any).options.url += "&role=watcher";
     this.setupWatcherHandlers();
   }
 

@@ -36,18 +36,21 @@ export class ServerTransport extends EventEmitter {
       this.wss.on("error", (err) => reject(new ConnectionError(err.message)));
 
       this.wss.on("connection", (ws, req) => {
-        const clientId = new URL(
+        const url = new URL(
           req.url ?? "/",
           `http://${req.headers.host}`
-        ).searchParams.get("clientId");
+        );
+        const clientId = url.searchParams.get("clientId");
 
         if (!clientId) {
           ws.close(4000, "Missing clientId");
           return;
         }
 
+        const role = (url.searchParams.get("role") as "client" | "watcher") || "client";
+
         this.connections.set(clientId, ws);
-        this.emit("connection", clientId);
+        this.emit("connection", clientId, role);
 
         ws.on("message", (data) => {
           try {

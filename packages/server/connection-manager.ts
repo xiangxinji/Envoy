@@ -2,6 +2,7 @@ import { EventEmitter } from "../core/event-emitter.js";
 
 export interface ClientState {
   id: string;
+  role: "client" | "watcher";
   status: "online" | "offline";
   connectedAt: number;
   lastHeartbeat: number;
@@ -21,10 +22,11 @@ export class ConnectionManager extends EventEmitter {
     super();
   }
 
-  addClient(clientId: string): void {
+  addClient(clientId: string, role: "client" | "watcher" = "client"): void {
     const now = Date.now();
     this.clients.set(clientId, {
       id: clientId,
+      role,
       status: "online",
       connectedAt: now,
       lastHeartbeat: now,
@@ -39,7 +41,6 @@ export class ConnectionManager extends EventEmitter {
     if (client) {
       client.status = "offline";
       this.clients.delete(clientId);
-      this.emit("client:offline", clientId);
     }
   }
 
@@ -66,6 +67,10 @@ export class ConnectionManager extends EventEmitter {
     return this.getAllClients().filter((c) => c.status !== "offline");
   }
 
+  getWatchers(): ClientState[] {
+    return [...this.clients.values()].filter((c) => c.role === "watcher");
+  }
+
   isOnline(clientId: string): boolean {
     const client = this.clients.get(clientId);
     return client !== undefined && client.status !== "offline";
@@ -77,7 +82,7 @@ export class ConnectionManager extends EventEmitter {
       const now = Date.now();
       for (const client of this.clients.values()) {
         if (client.status !== "offline" && now - client.lastHeartbeat > timeout) {
-          client.status = "offline";
+          this.clients.delete(client.id);
           this.emit("client:offline", client.id);
         }
       }

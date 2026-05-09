@@ -87,17 +87,22 @@ export class Server extends EventEmitter<ServerEvents> {
   }
 
   private setupTransportHandlers(): void {
-    this.transport.on("connection", (clientId: unknown) => {
+    this.transport.on("connection", (clientId: unknown, role: unknown) => {
       const id = clientId as string;
-      this.connectionManager.addClient(id);
+      const r = (role as "client" | "watcher") || "client";
+      this.connectionManager.addClient(id, r);
       const state = this.connectionManager.getClient(id)!;
       this.emit("client:online", state);
+      this.notifyWatchers("client:online", state);
     });
 
     this.transport.on("close", (clientId: unknown) => {
       const id = clientId as string;
+      const client = this.connectionManager.getClient(id);
+      if (!client) return;
       this.connectionManager.removeClient(id);
       this.emit("client:offline", { id });
+      this.notifyWatchers("client:offline", { id });
       this.failClientTasks(id);
     });
 
@@ -276,6 +281,9 @@ export class Server extends EventEmitter<ServerEvents> {
 
   private notifyTaskUpdate(task: Task): void {
     const targets = new Set<string>([task.createBy, ...task.subscribe]);
+    for (const watcher of this.connectionManager.getWatchers()) {
+      targets.add(watcher.id);
+    }
     for (const targetId of targets) {
       if (!this.connectionManager.isOnline(targetId)) continue;
       try {
@@ -286,6 +294,14 @@ export class Server extends EventEmitter<ServerEvents> {
       }
     }
     this.emit("task:updated", task);
+  }
+
+  private notifyWatchers(subtype: string, payload: unknown): void {
+    for (const watcher of this.connectionManager.getWatchers()) {
+      try {
+        this.notify(watcher.id, subtype, payload);
+      } catch {}
+    }
   }
 
   private failClientTasks(clientId: string): void {
