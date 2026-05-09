@@ -247,6 +247,9 @@ export class Server extends EventEmitter<ServerEvents> {
         break;
       case "notify":
       case "message":
+        if (msg.to !== "server") {
+          this.transport.send(msg.to, msg);
+        }
         this.emit("message", clientId, msg);
         break;
       default:

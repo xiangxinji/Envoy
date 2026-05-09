@@ -154,6 +154,12 @@ export class Client extends EventEmitter<ClientEvents> {
     this.transport.send(msg);
   }
 
+  /** 向指定客户端发送消息（fire-and-forget） */
+  sendTo(targetId: string, subtype: string, payload: unknown): void {
+    const msg = createMessage("message", this.options.id, targetId, payload, { subtype });
+    this.transport.send(msg);
+  }
+
   // --- 内部方法 ---
 
   /** 设置传输层事件处理器 */

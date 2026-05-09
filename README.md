@@ -145,6 +145,7 @@ interface ClientOptions {
 | `disconnect()` | 断开连接 |
 | `execute(taskName, params?): Promise<unknown>` | 请求服务端执行任务 |
 | `send(subtype, payload)` | 向服务端发送消息 |
+| `sendTo(targetId, subtype, payload)` | 向指定客户端发送消息（fire-and-forget） |
 
 #### 事件
 
@@ -157,6 +158,7 @@ interface ClientOptions {
 | `notify` | `Message` | 收到通知 |
 | `notify:<subtype>` | `payload` | 收到特定类型通知 |
 | `message` | `Message` | 收到消息 |
+| `message:<subtype>` | `payload` | 收到特定类型消息（含客户端间消息） |
 | `error` | `Error` | 错误 |
 
 ### WatcherClient

@@ -9,9 +9,8 @@ async function sleep(ms: number) {
  * 客户端间通信示例
  *
  * 演示:
- * 1. 客户端 A 注册能力
- * 2. 客户端 B 通过 execute 调用 A 的能力
- * 3. 请求通过 Server 路由
+ * 1. 客户端 A 注册能力，客户端 B 通过 execute 调用 A 的能力
+ * 2. 客户端间通过 sendTo 发送简单消息（fire-and-forget）
  */
 async function main() {
   const server = new Server({ port: 9011 });
@@ -68,6 +67,11 @@ async function main() {
     servers: ["ws://localhost:9011"],
   });
 
+  // A 监听来自其他客户端的消息
+  clientA.on("message:greeting", (payload) => {
+    console.log("[Calculator] 收到消息:", payload);
+  });
+
   await clientA.connect();
   await clientB.connect();
   console.log("[Clients] 已连接\n");
@@ -88,6 +92,11 @@ async function main() {
   const addResult = await clientB.execute("add", { a: 3, b: 4 }) as { result: number };
   const mulResult = await clientB.execute("multiply", { a: addResult.result, b: 2 }) as { result: number };
   console.log(`[B] (3 + 4) * 2 = ${mulResult.result}`);
+
+  // B 向 A 发送简单消息（fire-and-forget）
+  console.log("\n--- 客户端间消息 ---");
+  clientB.sendTo("calculator", "greeting", { text: "你好，我是 requester！" });
+  console.log("[B] 已发送消息给 calculator");
 
   await sleep(1000);
 
