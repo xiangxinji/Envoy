@@ -5,7 +5,17 @@ import type { Task, SubmitOptions } from "../core/task.js";
 import { ClientTransport } from "./transport.js";
 import { Heartbeat } from "./heartbeat.js";
 
-export type TaskHandler = (task: Task) => Promise<unknown>;
+export interface ClientTask {
+  id: string;
+  serverTask: Task;
+  status: "pending" | "running" | "completed" | "failed";
+  result?: unknown;
+  error?: string;
+  startedAt?: number;
+  completedAt?: number;
+}
+
+export type TaskHandler = (clientTask: ClientTask) => Promise<unknown>;
 
 export type ClientEvents = {
   "connected": () => void;
@@ -30,8 +40,9 @@ export class Client extends EventEmitter<ClientEvents> {
   protected transport: ClientTransport;
   private heartbeat: Heartbeat;
   private handler: TaskHandler | null = null;
-  private queue: Task[] = [];
-  private running: Task | null = null;
+  private queue: ClientTask[] = [];
+  private running: ClientTask | null = null;
+  private taskCounter = 0;
 
   constructor(protected options: ClientOptions) {
     super();
@@ -57,8 +68,17 @@ export class Client extends EventEmitter<ClientEvents> {
     this.setupTransport();
   }
 
+  get queueLength(): number {
+    return this.queue.length;
+  }
+
+  get currentTask(): ClientTask | null {
+    return this.running;
+  }
+
   doing(fn: TaskHandler): void {
     this.handler = fn;
+    this.processNext();
   }
 
   async connect(): Promise<void> {
@@ -129,8 +149,20 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   private handleDispatch(msg: Message): void {
-    const task = msg.payload as Task;
-    this.queue.push(task);
+    const serverTask = msg.payload as Task;
+
+    // 检查是否已有对应 ClientTask（避免重复创建）
+    const exists = this.queue.some((ct) => ct.serverTask.id === serverTask.id)
+      || this.running?.serverTask.id === serverTask.id;
+    if (exists) return;
+
+    const clientTask: ClientTask = {
+      id: `ct-${Date.now()}-${++this.taskCounter}`,
+      serverTask,
+      status: "pending",
+    };
+
+    this.queue.push(clientTask);
     this.processNext();
   }
 
@@ -138,17 +170,27 @@ export class Client extends EventEmitter<ClientEvents> {
     if (this.running || !this.handler || this.queue.length === 0) return;
 
     this.running = this.queue.shift()!;
+    this.running.status = "running";
+    this.running.startedAt = Date.now();
+
     try {
       const result = await this.handler(this.running);
-      this.sendResult(this.running.id, true, result);
+      this.running.status = "completed";
+      this.running.result = result;
+      this.running.completedAt = Date.now();
+      this.sendResult(this.running.serverTask.id, true, result);
     } catch (err) {
+      this.running.status = "failed";
+      this.running.error = err instanceof Error ? err.message : String(err);
+      this.running.completedAt = Date.now();
       this.sendResult(
-        this.running.id,
+        this.running.serverTask.id,
         false,
         undefined,
-        err instanceof Error ? err.message : String(err)
+        this.running.error
       );
     }
+
     this.running = null;
     this.processNext();
   }

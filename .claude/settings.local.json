@@ -22,7 +22,9 @@
       "Bash(npm create *)",
       "Bash(npx vite *)",
       "Bash(curl *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(npx vitest *)",
+      "Bash(pnpm run *)"
     ]
   }
 }
