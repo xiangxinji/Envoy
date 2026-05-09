@@ -1,7 +1,7 @@
 import { EventEmitter } from "../core/event-emitter.js";
 import { createMessage } from "../core/message.js";
 import type { Message } from "../core/message.js";
-import type { Task, Resource, SubmitOptions } from "../core/task.js";
+import type { Task, SubmitOptions } from "../core/task.js";
 import { ServerTransport } from "./transport.js";
 import { ConnectionManager } from "./connection-manager.js";
 import type { ClientState } from "./connection-manager.js";

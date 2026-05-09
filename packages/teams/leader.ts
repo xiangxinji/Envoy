@@ -1,9 +1,7 @@
 import { Client } from "../client/client.js";
-import type { Message } from "../core/message.js";
 import type { LeaderOptions } from "./types.js";
 
 export class Leader extends Client {
-
 
   constructor(options: LeaderOptions) {
     super(options);
@@ -13,6 +11,4 @@ export class Leader extends Client {
     await super.connect();
     this.send("team:join", { role: "leader" });
   }
-
-
 }

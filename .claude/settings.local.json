@@ -24,7 +24,9 @@
       "Bash(curl *)",
       "Bash(git *)",
       "Bash(npx vitest *)",
-      "Bash(pnpm run *)"
+      "Bash(pnpm run *)",
+      "Bash(xxd packages/teams/leader.ts)",
+      "Bash(xxd /c/Users/Administrator/Desktop/UniOpc/packages/teams/leader.ts)"
     ]
   }
 }

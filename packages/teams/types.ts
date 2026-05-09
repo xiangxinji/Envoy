@@ -10,7 +10,6 @@ export interface TeamJoinPayload {
 export interface TeamOptions {
   port: number;
   host?: string;
-  resourceRoot?: string;
   heartbeatTimeout?: number;
   defaultTaskTimeout?: number;
 }
