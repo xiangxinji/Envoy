@@ -86,6 +86,44 @@ export class Server extends EventEmitter<ServerEvents> {
     this.transport.send(clientId, msg);
   }
 
+  relay(fromId: string, toId: string, subtype: string, payload: unknown): void {
+    if (!this.connectionManager.isOnline(toId)) return;
+    const msg = createMessage("message", fromId, toId, payload, { subtype });
+    this.transport.send(toId, msg);
+  }
+
+  submitFrom(fromId: string, options: SubmitOptions): string {
+    const taskId = `task-${Date.now()}-${++this.taskCounter}`;
+    const task: Task = {
+      id: taskId,
+      createBy: fromId,
+      subscribe: options.subscribe!,
+      content: options.content,
+      mode: options.mode,
+      status: "pending",
+      resources: [],
+      createdAt: Date.now(),
+    };
+
+    const state: TaskState = {
+      task,
+      serialIndex: 0,
+      pendingClients: new Set(options.subscribe!),
+    };
+    this.tasks.set(taskId, state);
+
+    this.emit("task:created", task);
+    this.notifyTaskUpdate(task);
+
+    if (task.mode === "serial") {
+      this.dispatchSerial(state);
+    } else {
+      this.dispatchParallel(state);
+    }
+
+    return taskId;
+  }
+
   private setupTransportHandlers(): void {
     this.transport.on("connection", (clientId: unknown, role: unknown) => {
       const id = clientId as string;
