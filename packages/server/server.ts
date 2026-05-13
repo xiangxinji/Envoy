@@ -285,6 +285,13 @@ export class Server extends EventEmitter<ServerEvents> {
     this.processResult(clientId, taskId, success, data, error);
   }
 
+  addResourceToTask(taskId: string, type: string, by: string, data: unknown, notify = true): void {
+    const state = this.tasks.get(taskId);
+    if (!state) return;
+    this.addResource(state.task, type, by, data);
+    if (notify) this.notifyTaskUpdate(state.task);
+  }
+
   private processResult(clientId: string, taskId: string, success: boolean, data?: unknown, error?: string): void {
 
     const state = this.tasks.get(taskId);
