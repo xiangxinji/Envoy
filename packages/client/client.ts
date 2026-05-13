@@ -34,6 +34,7 @@ export interface ClientOptions {
   reconnect?: boolean;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
+  autoSendResult?: boolean;
 }
 
 export class Client extends EventEmitter<ClientEvents> {
@@ -178,17 +179,21 @@ export class Client extends EventEmitter<ClientEvents> {
       this.running.status = "completed";
       this.running.result = result;
       this.running.completedAt = Date.now();
-      this.sendResult(this.running.serverTask.id, true, result);
+      if (this.options.autoSendResult !== false) {
+        this.sendResult(this.running.serverTask.id, true, result);
+      }
     } catch (err) {
       this.running.status = "failed";
       this.running.error = err instanceof Error ? err.message : String(err);
       this.running.completedAt = Date.now();
-      this.sendResult(
-        this.running.serverTask.id,
-        false,
-        undefined,
-        this.running.error
-      );
+      if (this.options.autoSendResult !== false) {
+        this.sendResult(
+          this.running.serverTask.id,
+          false,
+          undefined,
+          this.running.error
+        );
+      }
     }
 
     this.running = null;

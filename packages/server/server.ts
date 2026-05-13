@@ -278,6 +278,14 @@ export class Server extends EventEmitter<ServerEvents> {
       data?: unknown;
       error?: string;
     };
+    this.processResult(clientId, taskId, success, data, error);
+  }
+
+  receiveResult(clientId: string, taskId: string, success: boolean, data?: unknown, error?: string): void {
+    this.processResult(clientId, taskId, success, data, error);
+  }
+
+  private processResult(clientId: string, taskId: string, success: boolean, data?: unknown, error?: string): void {
 
     const state = this.tasks.get(taskId);
     if (!state) return;
