@@ -10,6 +10,8 @@ interface TaskState {
   task: Task;
   serialIndex: number;
   pendingClients: Set<string>;
+  leaderReviewing: boolean;
+  retryCount: number;
 }
 
 export type ServerEvents = {
@@ -103,12 +105,15 @@ export class Server extends EventEmitter<ServerEvents> {
       status: "pending",
       resources: [],
       createdAt: Date.now(),
+      attempt: 1,
     };
 
     const state: TaskState = {
       task,
       serialIndex: 0,
       pendingClients: new Set(options.subscribe!),
+      leaderReviewing: false,
+      retryCount: 0,
     };
     this.tasks.set(taskId, state);
 
@@ -205,12 +210,15 @@ export class Server extends EventEmitter<ServerEvents> {
       status: "pending",
       resources: [],
       createdAt: Date.now(),
+      attempt: 1,
     };
 
     const state: TaskState = {
       task,
       serialIndex: 0,
       pendingClients: new Set(payload.subscribe),
+      leaderReviewing: false,
+      retryCount: 0,
     };
     this.tasks.set(taskId, state);
 
@@ -227,7 +235,7 @@ export class Server extends EventEmitter<ServerEvents> {
   private dispatchSerial(state: TaskState): void {
     const { task } = state;
     if (state.serialIndex >= task.subscribe.length) {
-      this.completeTask(state);
+      this.dispatchToLeader(state);
       return;
     }
 
@@ -267,7 +275,7 @@ export class Server extends EventEmitter<ServerEvents> {
     }
 
     if (state.pendingClients.size === 0) {
-      this.completeTask(state);
+      this.dispatchToLeader(state);
     }
   }
 
@@ -293,31 +301,55 @@ export class Server extends EventEmitter<ServerEvents> {
   }
 
   private processResult(clientId: string, taskId: string, success: boolean, data?: unknown, error?: string): void {
-
     const state = this.tasks.get(taskId);
     if (!state) return;
 
     const { task } = state;
 
     if (!success) {
-      this.addResource(task, "client-result", clientId, { error });
-      task.status = "failed";
-      this.emit("task:failed", task);
-      this.notifyTaskUpdate(task);
+      if (state.leaderReviewing) {
+        // Leader review failed
+        this.addResource(task, "leader-review", clientId, { success: false, error });
+        if (state.retryCount < 10) {
+          this.resetForRetry(state);
+        } else {
+          task.status = "failed";
+          this.emit("task:failed", task);
+          this.notifyTaskUpdate(task);
+        }
+      } else {
+        // Member execution failed
+        this.addResource(task, "client-result", clientId, { error });
+        task.status = "failed";
+        this.emit("task:failed", task);
+        this.notifyTaskUpdate(task);
+      }
       return;
     }
 
+    if (state.leaderReviewing) {
+      // Leader review passed
+      this.addResource(task, "leader-review", clientId, { success: true, data });
+      this.completeTask(state);
+      return;
+    }
+
+    // Member execution succeeded
     this.addResource(task, "client-result", clientId, data);
     state.pendingClients.delete(clientId);
 
     if (task.mode === "serial") {
       state.serialIndex++;
       this.notifyTaskUpdate(task);
-      this.dispatchSerial(state);
+      if (state.serialIndex >= task.subscribe.length) {
+        this.dispatchToLeader(state);
+      } else {
+        this.dispatchSerial(state);
+      }
     } else {
       this.notifyTaskUpdate(task);
       if (state.pendingClients.size === 0) {
-        this.completeTask(state);
+        this.dispatchToLeader(state);
       }
     }
   }
@@ -328,8 +360,45 @@ export class Server extends EventEmitter<ServerEvents> {
     this.notifyTaskUpdate(state.task);
   }
 
-  private addResource(task: Task, type: string, by: string, data: unknown): void {
-    task.resources.push({ type, by, data });
+  private dispatchToLeader(state: TaskState): void {
+    const { task } = state;
+    const leaderId = task.createBy;
+
+    if (!this.connectionManager.isOnline(leaderId)) {
+      // Leader offline, complete task directly for now
+      this.completeTask(state);
+      return;
+    }
+
+    state.leaderReviewing = true;
+    task.status = "reviewing";
+    this.notifyTaskUpdate(task);
+
+    const dispatchMsg = createMessage("dispatch", "server", leaderId, task);
+    this.transport.send(leaderId, dispatchMsg);
+  }
+
+  private resetForRetry(state: TaskState): void {
+    const { task } = state;
+
+    state.leaderReviewing = false;
+    state.retryCount++;
+    task.attempt++;
+    state.pendingClients = new Set(task.subscribe);
+    state.serialIndex = 0;
+    task.status = "running";
+
+    this.notifyTaskUpdate(task);
+
+    if (task.mode === "serial") {
+      this.dispatchSerial(state);
+    } else {
+      this.dispatchParallel(state);
+    }
+  }
+
+  private addResource(task: Task, type: string, by: string, data: unknown, attempt?: number): void {
+    task.resources.push({ type, by, data, attempt: attempt ?? task.attempt });
   }
 
   private notifyTaskUpdate(task: Task): void {
@@ -359,8 +428,18 @@ export class Server extends EventEmitter<ServerEvents> {
 
   private failClientTasks(clientId: string): void {
     for (const [, state] of this.tasks) {
-      if (state.task.status !== "running" && state.task.status !== "pending") continue;
+      const taskStatus = state.task.status;
+      if (taskStatus !== "running" && taskStatus !== "pending" && taskStatus !== "reviewing") continue;
       if (!state.pendingClients.has(clientId) && state.task.createBy !== clientId) continue;
+
+      // Leader goes offline while reviewing
+      if (state.leaderReviewing && state.task.createBy === clientId) {
+        this.addResource(state.task, "leader-review", clientId, {
+          error: `Leader ${clientId} disconnected during review`,
+        });
+        this.completeTask(state);
+        continue;
+      }
 
       if (state.pendingClients.has(clientId)) {
         this.addResource(state.task, "client-result", clientId, {
@@ -374,9 +453,7 @@ export class Server extends EventEmitter<ServerEvents> {
         state.serialIndex++;
         this.dispatchSerial(state);
       } else if (state.pendingClients.size === 0) {
-        state.task.status = "failed";
-        this.emit("task:failed", state.task);
-        this.notifyTaskUpdate(state.task);
+        this.dispatchToLeader(state);
       }
     }
   }

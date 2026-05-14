@@ -152,10 +152,10 @@ export class Client extends EventEmitter<ClientEvents> {
   private handleDispatch(msg: Message): void {
     const serverTask = msg.payload as Task;
 
-    // 检查是否已有对应 ClientTask（避免重复创建）
-    const exists = this.queue.some((ct) => ct.serverTask.id === serverTask.id)
-      || this.running?.serverTask.id === serverTask.id;
-    if (exists) return;
+    // 检查是否已有对应 ClientTask 正在执行或排队中（避免重复创建）
+    const queued = this.queue.some((ct) => ct.serverTask.id === serverTask.id);
+    const running = this.running?.serverTask.id === serverTask.id;
+    if (queued || running) return;
 
     const clientTask: ClientTask = {
       id: `ct-${Date.now()}-${++this.taskCounter}`,
