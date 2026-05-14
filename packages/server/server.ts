@@ -37,7 +37,7 @@ export class Server extends EventEmitter<ServerEvents> {
   private tasks = new Map<string, TaskState>();
   private taskCounter = 0;
 
-  constructor(private options: ServerOptions) {
+  constructor(options: ServerOptions) {
     super();
 
     this.transport = new ServerTransport({
