@@ -300,6 +300,29 @@ export class Server extends EventEmitter<ServerEvents> {
     if (notify) this.notifyTaskUpdate(state.task);
   }
 
+  /** Manual status transition: pending → running. Used by task center "Start" button. */
+  startTask(taskId: string): Task | null {
+    const state = this.tasks.get(taskId);
+    if (!state) return null;
+    if (state.task.status !== "pending") return null;
+    state.task.status = "running";
+    this.notifyTaskUpdate(state.task);
+    return state.task;
+  }
+
+  /** Manual status transition: running → completed. Used by task center "Complete" button. */
+  manualCompleteTask(taskId: string, from: string, data?: unknown): Task | null {
+    const state = this.tasks.get(taskId);
+    if (!state) return null;
+    if (state.task.status !== "running") return null;
+    if (data) {
+      this.addResource(state.task, "client-result", from, data);
+    }
+    state.pendingClients.clear();
+    this.finishTask(state);
+    return state.task;
+  }
+
   private processResult(clientId: string, taskId: string, success: boolean, data?: unknown, error?: string): void {
     const state = this.tasks.get(taskId);
     if (!state) return;
@@ -330,7 +353,7 @@ export class Server extends EventEmitter<ServerEvents> {
     if (state.leaderReviewing) {
       // Leader review passed
       this.addResource(task, "leader-review", clientId, { success: true, data });
-      this.completeTask(state);
+      this.finishTask(state);
       return;
     }
 
@@ -354,7 +377,7 @@ export class Server extends EventEmitter<ServerEvents> {
     }
   }
 
-  private completeTask(state: TaskState): void {
+  private finishTask(state: TaskState): void {
     state.task.status = "completed";
     this.emit("task:completed", state.task);
     this.notifyTaskUpdate(state.task);
@@ -366,7 +389,7 @@ export class Server extends EventEmitter<ServerEvents> {
 
     if (!this.connectionManager.isOnline(leaderId)) {
       // Leader offline, complete task directly for now
-      this.completeTask(state);
+      this.finishTask(state);
       return;
     }
 
@@ -437,7 +460,7 @@ export class Server extends EventEmitter<ServerEvents> {
         this.addResource(state.task, "leader-review", clientId, {
           error: `Leader ${clientId} disconnected during review`,
         });
-        this.completeTask(state);
+        this.finishTask(state);
         continue;
       }
 
