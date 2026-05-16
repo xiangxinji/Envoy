@@ -17,6 +17,8 @@ export interface ClientTask {
 
 export type TaskHandler = (clientTask: ClientTask) => Promise<unknown>;
 
+export const SKIP_RESULT: unique symbol = Symbol("SKIP_RESULT");
+
 export type ClientEvents = {
   "connected": () => void;
   "disconnected": () => void;
@@ -170,28 +172,36 @@ export class Client extends EventEmitter<ClientEvents> {
   private async processNext(): Promise<void> {
     if (this.running || !this.handler || this.queue.length === 0) return;
 
-    this.running = this.queue.shift()!;
-    this.running.status = "running";
-    this.running.startedAt = Date.now();
+    const task = this.queue.shift()!;
+    this.running = task;
+    task.status = "running";
+    task.startedAt = Date.now();
 
     try {
-      const result = await this.handler(this.running);
-      this.running.status = "completed";
-      this.running.result = result;
-      this.running.completedAt = Date.now();
+      const result = await this.handler(task);
+
+      if (result === SKIP_RESULT) {
+        this.running = null;
+        this.processNext();
+        return;
+      }
+
+      task.status = "completed";
+      task.result = result;
+      task.completedAt = Date.now();
       if (this.options.autoSendResult !== false) {
-        this.sendResult(this.running.serverTask.id, true, result);
+        this.sendResult(task.serverTask.id, true, result);
       }
     } catch (err) {
-      this.running.status = "failed";
-      this.running.error = err instanceof Error ? err.message : String(err);
-      this.running.completedAt = Date.now();
+      task.status = "failed";
+      task.error = err instanceof Error ? err.message : String(err);
+      task.completedAt = Date.now();
       if (this.options.autoSendResult !== false) {
         this.sendResult(
-          this.running.serverTask.id,
+          task.serverTask.id,
           false,
           undefined,
-          this.running.error
+          task.error
         );
       }
     }

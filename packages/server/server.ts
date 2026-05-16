@@ -250,7 +250,6 @@ export class Server extends EventEmitter<ServerEvents> {
       return;
     }
 
-    task.status = "running";
     this.notifyTaskUpdate(task);
 
     const dispatchMsg = createMessage("dispatch", "server", targetId, task);
@@ -259,7 +258,6 @@ export class Server extends EventEmitter<ServerEvents> {
 
   private dispatchParallel(state: TaskState): void {
     const { task } = state;
-    task.status = "running";
     this.notifyTaskUpdate(task);
 
     for (const targetId of task.subscribe) {
@@ -300,17 +298,19 @@ export class Server extends EventEmitter<ServerEvents> {
     if (notify) this.notifyTaskUpdate(state.task);
   }
 
-  /** Manual status transition: pending → running. Used by task center "Start" button. */
+  /** Manual status transition: pending → running. Idempotent for parallel mode. */
   startTask(taskId: string): Task | null {
     const state = this.tasks.get(taskId);
     if (!state) return null;
-    if (state.task.status !== "pending") return null;
-    state.task.status = "running";
-    this.notifyTaskUpdate(state.task);
+    if (state.task.status !== "pending" && state.task.status !== "running") return null;
+    if (state.task.status === "pending") {
+      state.task.status = "running";
+      this.notifyTaskUpdate(state.task);
+    }
     return state.task;
   }
 
-  /** Manual status transition: running → completed. Used by task center "Complete" button. */
+  /** Manual completion: member marks their work done, follows serial/parallel dispatch logic. */
   manualCompleteTask(taskId: string, from: string, data?: unknown): Task | null {
     const state = this.tasks.get(taskId);
     if (!state) return null;
@@ -318,8 +318,21 @@ export class Server extends EventEmitter<ServerEvents> {
     if (data) {
       this.addResource(state.task, "client-result", from, data);
     }
-    state.pendingClients.clear();
-    this.finishTask(state);
+    state.pendingClients.delete(from);
+
+    if (state.task.mode === "serial") {
+      state.serialIndex++;
+      if (state.serialIndex >= state.task.subscribe.length) {
+        this.dispatchToLeader(state);
+      } else {
+        this.dispatchSerial(state);
+      }
+    } else {
+      this.notifyTaskUpdate(state.task);
+      if (state.pendingClients.size === 0) {
+        this.dispatchToLeader(state);
+      }
+    }
     return state.task;
   }
 
