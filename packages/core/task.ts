@@ -6,6 +6,7 @@ export interface Resource {
   by: string;
   data: unknown;
   attempt: number;
+  timestamp?: number;
 }
 
 export interface Task {

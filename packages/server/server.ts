@@ -434,7 +434,7 @@ export class Server extends EventEmitter<ServerEvents> {
   }
 
   private addResource(task: Task, type: string, by: string, data: unknown, attempt?: number): void {
-    task.resources.push({ type, by, data, attempt: attempt ?? task.attempt });
+    task.resources.push({ type, by, data, attempt: attempt ?? task.attempt, timestamp: Date.now() });
   }
 
   private notifyTaskUpdate(task: Task): void {
