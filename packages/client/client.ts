@@ -23,6 +23,7 @@ export type ClientEvents = {
   "connected": () => void;
   "disconnected": () => void;
   "reconnecting": (attempt: number) => void;
+  "reconnect_failed": () => void;
   "task": (task: Task) => void;
   "notify": (msg: Message) => void;
   "message": (msg: Message) => void;
@@ -111,6 +112,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
   private setupTransport(): void {
     this.transport.on("open", () => {
+      this.heartbeat.start();
       this.emit("connected");
     });
 
@@ -125,6 +127,10 @@ export class Client extends EventEmitter<ClientEvents> {
 
     this.transport.on("reconnecting", (attempt: unknown) => {
       this.emit("reconnecting", attempt as number);
+    });
+
+    this.transport.on("reconnect_failed", () => {
+      this.emit("reconnect_failed");
     });
   }
 
