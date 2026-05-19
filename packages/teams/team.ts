@@ -56,6 +56,17 @@ export class Team extends EventEmitter<TeamEvents> {
     }
   }
 
+  broadcastChat(fromId: string, subtype: string, payload: unknown): void {
+    for (const [clientId] of this.roles) {
+      if (clientId === fromId) continue;
+      this.server.relay(fromId, clientId, subtype, payload);
+    }
+  }
+
+  getOnlineMemberIds(): string[] {
+    return [...this.roles.keys()];
+  }
+
   private broadcastMembers(): void {
     const members = [...this.roles.entries()].map(([id, role]) => ({
       id,
