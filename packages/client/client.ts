@@ -28,6 +28,11 @@ export type ClientEvents = {
   "notify": (msg: Message) => void;
   "message": (msg: Message) => void;
   "error": (payload: unknown) => void;
+  "task_queued": (task: ClientTask) => void;
+  "task_started": (task: ClientTask) => void;
+  "task_completed": (task: ClientTask) => void;
+  "task_failed": (task: ClientTask) => void;
+  "task_skipped": (task: ClientTask) => void;
 };
 
 export interface ClientOptions {
@@ -47,6 +52,8 @@ export class Client extends EventEmitter<ClientEvents> {
   private queue: ClientTask[] = [];
   private running: ClientTask | null = null;
   private taskCounter = 0;
+  private history: ClientTask[] = [];
+  private static readonly HISTORY_LIMIT = 20;
 
   constructor(protected options: ClientOptions) {
     super();
@@ -78,6 +85,14 @@ export class Client extends EventEmitter<ClientEvents> {
 
   get currentTask(): ClientTask | null {
     return this.running;
+  }
+
+  get taskQueue(): readonly ClientTask[] {
+    return this.queue;
+  }
+
+  get taskHistory(): readonly ClientTask[] {
+    return this.history;
   }
 
   doing(fn: TaskHandler): void {
@@ -172,6 +187,7 @@ export class Client extends EventEmitter<ClientEvents> {
     };
 
     this.queue.push(clientTask);
+    this.emit("task_queued", clientTask);
     this.processNext();
   }
 
@@ -182,11 +198,14 @@ export class Client extends EventEmitter<ClientEvents> {
     this.running = task;
     task.status = "running";
     task.startedAt = Date.now();
+    this.emit("task_started", task);
 
     try {
       const result = await this.handler(task);
 
       if (result === SKIP_RESULT) {
+        this.emit("task_skipped", task);
+        this.pushHistory(task);
         this.running = null;
         this.processNext();
         return;
@@ -195,6 +214,8 @@ export class Client extends EventEmitter<ClientEvents> {
       task.status = "completed";
       task.result = result;
       task.completedAt = Date.now();
+      this.emit("task_completed", task);
+      this.pushHistory(task);
       if (this.options.autoSendResult !== false) {
         this.sendResult(task.serverTask.id, true, result);
       }
@@ -202,6 +223,8 @@ export class Client extends EventEmitter<ClientEvents> {
       task.status = "failed";
       task.error = err instanceof Error ? err.message : String(err);
       task.completedAt = Date.now();
+      this.emit("task_failed", task);
+      this.pushHistory(task);
       if (this.options.autoSendResult !== false) {
         this.sendResult(
           task.serverTask.id,
@@ -214,6 +237,13 @@ export class Client extends EventEmitter<ClientEvents> {
 
     this.running = null;
     this.processNext();
+  }
+
+  private pushHistory(task: ClientTask): void {
+    this.history.unshift(task);
+    if (this.history.length > Client.HISTORY_LIMIT) {
+      this.history.pop();
+    }
   }
 
   private sendResult(taskId: string, success: boolean, data?: unknown, error?: string): void {
