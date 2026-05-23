@@ -137,6 +137,7 @@ export class Server extends EventEmitter<ServerEvents> {
       const state = this.connectionManager.getClient(id)!;
       this.emit("client:online", state);
       this.notifyWatchers("client:online", state);
+      this.reassignPendingTasks(id);
     });
 
     this.transport.on("close", (clientId: unknown) => {
@@ -241,11 +242,7 @@ export class Server extends EventEmitter<ServerEvents> {
 
     const targetId = task.subscribe[state.serialIndex];
     if (!this.connectionManager.isOnline(targetId)) {
-      task.status = "failed";
-      this.addResource(task, "client-result", targetId, {
-        error: `Client ${targetId} is offline`,
-      });
-      this.emit("task:failed", task);
+      // Target is offline — wait for reconnection instead of failing.
       this.notifyTaskUpdate(task);
       return;
     }
@@ -262,19 +259,16 @@ export class Server extends EventEmitter<ServerEvents> {
 
     for (const targetId of task.subscribe) {
       if (!this.connectionManager.isOnline(targetId)) {
-        state.pendingClients.delete(targetId);
-        this.addResource(task, "client-result", targetId, {
-          error: `Client ${targetId} is offline`,
-        });
+        // Skip dispatching to offline members, but keep them in pendingClients.
+        // They will receive the task when they reconnect.
         continue;
       }
       const dispatchMsg = createMessage("dispatch", "server", targetId, task);
       this.transport.send(targetId, dispatchMsg);
     }
 
-    if (state.pendingClients.size === 0) {
-      this.dispatchToLeader(state);
-    }
+    // Only dispatch to leader if all members have actually submitted results
+    // (not just because some are offline)
   }
 
   private handleResult(clientId: string, msg: Message): void {
@@ -414,6 +408,17 @@ export class Server extends EventEmitter<ServerEvents> {
     this.transport.send(leaderId, dispatchMsg);
   }
 
+  /** Re-dispatch pending tasks to a reconnecting client. */
+  private reassignPendingTasks(clientId: string): void {
+    for (const [, state] of this.tasks) {
+      if (state.task.status !== "running" && state.task.status !== "pending") continue;
+      if (!state.pendingClients.has(clientId)) continue;
+
+      const dispatchMsg = createMessage("dispatch", "server", clientId, state.task);
+      this.transport.send(clientId, dispatchMsg);
+    }
+  }
+
   private resetForRetry(state: TaskState): void {
     const { task } = state;
 
@@ -468,7 +473,7 @@ export class Server extends EventEmitter<ServerEvents> {
       if (taskStatus !== "running" && taskStatus !== "pending" && taskStatus !== "reviewing") continue;
       if (!state.pendingClients.has(clientId) && state.task.createBy !== clientId) continue;
 
-      // Leader goes offline while reviewing
+      // Leader goes offline while reviewing — still finish the task
       if (state.leaderReviewing && state.task.createBy === clientId) {
         this.addResource(state.task, "leader-review", clientId, {
           error: `Leader ${clientId} disconnected during review`,
@@ -477,20 +482,9 @@ export class Server extends EventEmitter<ServerEvents> {
         continue;
       }
 
-      if (state.pendingClients.has(clientId)) {
-        this.addResource(state.task, "client-result", clientId, {
-          error: `Client ${clientId} disconnected`,
-        });
-        state.pendingClients.delete(clientId);
-      }
-
-      if (state.task.mode === "serial" && state.pendingClients.size > 0) {
-        // serial: try next client
-        state.serialIndex++;
-        this.dispatchSerial(state);
-      } else if (state.pendingClients.size === 0) {
-        this.dispatchToLeader(state);
-      }
+      // Member offline: keep them in pendingClients so the task waits for reconnection.
+      // Do NOT delete from pendingClients or add error resources.
+      // When the member reconnects, they will receive the task again.
     }
   }
 }
