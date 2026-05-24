@@ -24,6 +24,7 @@ export type ClientEvents = {
   "disconnected": () => void;
   "reconnecting": (attempt: number) => void;
   "reconnect_failed": () => void;
+  "rejected": (reason: string) => void;
   "task": (task: Task) => void;
   "notify": (msg: Message) => void;
   "message": (msg: Message) => void;
@@ -138,6 +139,11 @@ export class Client extends EventEmitter<ClientEvents> {
     this.transport.on("close", () => {
       this.heartbeat.stop();
       this.emit("disconnected");
+    });
+
+    this.transport.on("rejected", (reason: unknown) => {
+      this.heartbeat.stop();
+      this.emit("rejected", reason as string);
     });
 
     this.transport.on("reconnecting", (attempt: unknown) => {

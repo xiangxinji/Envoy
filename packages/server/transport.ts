@@ -49,6 +49,20 @@ export class ServerTransport extends EventEmitter {
 
         const role = (url.searchParams.get("role") as "client" | "watcher") || "client";
 
+        // Reject new connection if clientId is already connected
+        const existing = this.connections.get(clientId);
+        if (existing && existing.readyState === WebSocket.OPEN) {
+          ws.on("error", () => {});
+          ws.close(4001, "DUPLICATE_LOGIN");
+          return;
+        }
+        // Clean up stale connection (not OPEN) and allow new one
+        if (existing) {
+          existing.removeAllListeners();
+          this.connections.delete(clientId);
+          this.emit("close", clientId);
+        }
+
         this.connections.set(clientId, ws);
         this.emit("connection", clientId, role);
 
