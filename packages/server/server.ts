@@ -14,6 +14,13 @@ interface TaskState {
   retryCount: number;
 }
 
+export interface SerializedTaskState {
+  serialIndex: number;
+  pendingClients: string[];
+  leaderReviewing: boolean;
+  retryCount: number;
+}
+
 export type ServerEvents = {
   "client:online": (client: ClientState) => void;
   "client:offline": (info: { id: string }) => void;
@@ -79,8 +86,54 @@ export class Server extends EventEmitter<ServerEvents> {
     return this.tasks.get(taskId)?.task;
   }
 
+  getTaskState(taskId: string): SerializedTaskState | null {
+    const state = this.tasks.get(taskId);
+    if (!state) return null;
+    return {
+      serialIndex: state.serialIndex,
+      pendingClients: [...state.pendingClients],
+      leaderReviewing: state.leaderReviewing,
+      retryCount: state.retryCount,
+    };
+  }
+
   getAllTasks(): Task[] {
     return [...this.tasks.values()].map((ts) => ts.task);
+  }
+
+  loadTaskStates(entries: Array<{ task: Task; state: SerializedTaskState }>): void {
+    for (const { task, state } of entries) {
+      if (this.tasks.has(task.id)) continue;
+      this.tasks.set(task.id, {
+        task,
+        serialIndex: state.serialIndex,
+        pendingClients: new Set(state.pendingClients),
+        leaderReviewing: state.leaderReviewing,
+        retryCount: state.retryCount,
+      });
+    }
+  }
+
+  redispatchRestoredTasks(): void {
+    for (const [, state] of this.tasks) {
+      const { task } = state;
+      if (task.status === "pending") {
+        if (task.mode === "serial") {
+          this.dispatchSerial(state);
+        } else {
+          this.dispatchParallel(state);
+        }
+      } else if (task.status === "running") {
+        for (const clientId of state.pendingClients) {
+          if (!this.connectionManager.isOnline(clientId)) continue;
+          const dispatchMsg = createMessage("dispatch", "server", clientId, task);
+          this.transport.send(clientId, dispatchMsg);
+        }
+      }
+      // "reviewing" tasks are NOT re-dispatched: the leader already received
+      // the task for review. Re-dispatching would trigger duplicate review
+      // attempts that could fail and cause status regression.
+    }
   }
 
   notify(clientId: string, subtype: string, payload: unknown): void {
@@ -427,8 +480,7 @@ export class Server extends EventEmitter<ServerEvents> {
     task.attempt++;
     state.pendingClients = new Set(task.subscribe);
     state.serialIndex = 0;
-    task.status = "running";
-
+    task.status = "pending";
     this.notifyTaskUpdate(task);
 
     if (task.mode === "serial") {

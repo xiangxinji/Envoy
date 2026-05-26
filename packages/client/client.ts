@@ -182,9 +182,14 @@ export class Client extends EventEmitter<ClientEvents> {
     const serverTask = msg.payload as Task;
 
     // 检查是否已有对应 ClientTask 正在执行或排队中（避免重复创建）
-    const queued = this.queue.some((ct) => ct.serverTask.id === serverTask.id);
-    const running = this.running?.serverTask.id === serverTask.id;
-    if (queued || running) return;
+    // 同一 taskId 但 attempt 更新时，移除旧版本（leader 驳回后的重试场景）
+    if (this.running?.serverTask.id === serverTask.id) {
+      if (this.running.serverTask.attempt >= serverTask.attempt) return;
+      // 旧 attempt 正在执行，新 attempt 到达 — 取消旧的
+      this.running = null;
+    }
+    // 从队列中移除同 taskId 的旧 attempt
+    this.queue = this.queue.filter((ct) => ct.serverTask.id !== serverTask.id);
 
     const clientTask: ClientTask = {
       id: `ct-${Date.now()}-${++this.taskCounter}`,
