@@ -34,6 +34,7 @@ export type ClientEvents = {
   "task_completed": (task: ClientTask) => void;
   "task_failed": (task: ClientTask) => void;
   "task_skipped": (task: ClientTask) => void;
+  "task_finished": (task: ClientTask) => void;
 };
 
 export interface ClientOptions {
@@ -247,6 +248,7 @@ export class Client extends EventEmitter<ClientEvents> {
     }
 
     this.running = null;
+    this.emit("task_finished", task);
     this.processNext();
   }
 
