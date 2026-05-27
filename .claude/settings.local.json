@@ -27,7 +27,8 @@
       "Bash(pnpm run *)",
       "Bash(xxd packages/teams/leader.ts)",
       "Bash(xxd /c/Users/Administrator/Desktop/UniOpc/packages/teams/leader.ts)",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "Bash(npx jest *)"
     ]
   }
 }

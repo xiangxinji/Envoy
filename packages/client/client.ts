@@ -36,7 +36,13 @@ export type ClientEvents = {
   "task_failed": (task: ClientTask) => void;
   "task_skipped": (task: ClientTask) => void;
   "task_finished": (task: ClientTask) => void;
-};
+  "review_queued": (task: ClientTask) => void;
+  "review_started": (task: ClientTask) => void;
+  "review_completed": (task: ClientTask) => void;
+  "review_failed": (task: ClientTask) => void;
+  "review_skipped": (task: ClientTask) => void;
+  "review_finished": (task: ClientTask) => void;
+}
 
 export interface ClientOptions {
   id: string;
@@ -51,6 +57,7 @@ export class Client extends EventEmitter<ClientEvents> {
   protected transport: ClientTransport;
   private heartbeat: Heartbeat;
   private handler: TaskHandler | null = null;
+  private reviewHandler: TaskHandler | null = null;
   private queue: ClientTask[] = [];
   private running: ClientTask | null = null;
   private taskCounter = 0;
@@ -100,6 +107,15 @@ export class Client extends EventEmitter<ClientEvents> {
   doing(fn: TaskHandler): void {
     this.handler = fn;
     this.processNext();
+  }
+
+  reviewing(fn: TaskHandler): void {
+    this.reviewHandler = fn;
+    this.processNext();
+  }
+
+  review(taskId: string, approved: boolean, data?: unknown, error?: string): void {
+    this.sendResult(taskId, approved, data, error);
   }
 
   async connect(): Promise<void> {
@@ -199,25 +215,35 @@ export class Client extends EventEmitter<ClientEvents> {
     };
 
     this.queue.push(clientTask);
-    this.emit("task_queued", clientTask);
+    this.emit(clientTask.reason === "review" ? "review_queued" : "task_queued", clientTask);
     this.processNext();
   }
 
   private async processNext(): Promise<void> {
-    if (this.running || !this.handler || this.queue.length === 0) return;
+    if (this.running || this.queue.length === 0) return;
 
-    const task = this.queue.shift()!;
+    const task = this.queue[0];
+    const fn = task.reason === "review" ? this.reviewHandler : this.handler;
+    if (!fn) return;
+
+    this.queue.shift();
     this.running = task;
     task.startedAt = Date.now();
-    this.emit("task_started", task);
+
+    const e = task.reason === "review"
+      ? { started: "review_started", completed: "review_completed", failed: "review_failed", skipped: "review_skipped", finished: "review_finished" } as const
+      : { started: "task_started", completed: "task_completed", failed: "task_failed", skipped: "task_skipped", finished: "task_finished" } as const;
+
+    this.emit(e.started, task);
 
     try {
-      const result = await this.handler(task);
+      const result = await fn(task);
 
       if (result === SKIP_RESULT) {
-        this.emit("task_skipped", task);
+        this.emit(e.skipped, task);
         this.pushHistory(task);
         this.running = null;
+        this.emit(e.finished, task);
         this.processNext();
         return;
       }
@@ -225,23 +251,23 @@ export class Client extends EventEmitter<ClientEvents> {
       if (result === EXECUTION_TIMEOUT) {
         task.error = "execution_timeout";
         task.completedAt = Date.now();
-        this.emit("task_failed", task);
+        this.emit(e.failed, task);
         this.pushHistory(task);
       } else {
         task.result = result;
         task.completedAt = Date.now();
-        this.emit("task_completed", task);
+        this.emit(e.completed, task);
         this.pushHistory(task);
       }
     } catch (err) {
       task.error = err instanceof Error ? err.message : String(err);
       task.completedAt = Date.now();
-      this.emit("task_failed", task);
+      this.emit(e.failed, task);
       this.pushHistory(task);
     }
 
     this.running = null;
-    this.emit("task_finished", task);
+    this.emit(e.finished, task);
     this.processNext();
   }
 

@@ -3,18 +3,9 @@ import { Server } from "../../packages/server/server.js";
 import { Client } from "../../packages/client/client.js";
 import type { Task } from "../../packages/core/task.js";
 import type { ClientTask } from "../../packages/client/client.js";
+import { waitFor } from "../helpers/waitFor.js";
 
 const PORT = 9100;
-
-async function waitFor<T>(fn: () => T | undefined, timeout = 3000): Promise<T> {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    const result = fn();
-    if (result !== undefined && result !== null) return result;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw new Error("waitFor timed out");
-}
 
 describe("Server + Client 集成测试", () => {
   let server: Server;
@@ -31,7 +22,11 @@ describe("Server + Client 集成测试", () => {
   });
 
   function createClient(id: string): Client {
-    return new Client({ id, servers: [`ws://localhost:${port}`], reconnect: false, heartbeatInterval: 60000 });
+    const client = new Client({ id, servers: [`ws://localhost:${port}`], reconnect: false, heartbeatInterval: 60000 });
+    client.reviewing(async (ct: ClientTask) => {
+      client.review(ct.serverTask.id, true, "auto-approved");
+    });
+    return client;
   }
 
   it("客户端连接和断开触发 server 事件", async () => {
@@ -62,11 +57,15 @@ describe("Server + Client 集成测试", () => {
     const boss = createClient("boss");
 
     worker1.doing(async (ct: ClientTask) => {
-      return `w1-${ct.serverTask.content}`;
+      const result = `w1-${ct.serverTask.content}`;
+      worker1.sendResult(ct.serverTask.id, true, result);
+      return result;
     });
 
     worker2.doing(async (ct: ClientTask) => {
-      return `w2-${ct.serverTask.content}`;
+      const result = `w2-${ct.serverTask.content}`;
+      worker2.sendResult(ct.serverTask.id, true, result);
+      return result;
     });
 
     await worker1.connect();
@@ -88,9 +87,9 @@ describe("Server + Client 集成测试", () => {
     expect(completed.status).toBe("completed");
     expect(completed.createBy).toBe("boss");
     expect(completed.subscribe).toEqual(["worker1", "worker2"]);
-    expect(completed.resources).toHaveLength(2);
-    expect(completed.resources[0]).toEqual({ type: "client-result", by: "worker1", data: "w1-do-work" });
-    expect(completed.resources[1]).toEqual({ type: "client-result", by: "worker2", data: "w2-do-work" });
+    expect(completed.resources).toHaveLength(3); // 2 worker results + 1 leader review
+    expect(completed.resources[0]).toEqual({ type: "client-result", by: "worker1", data: "w1-do-work", attempt: 1, timestamp: expect.any(Number) });
+    expect(completed.resources[1]).toEqual({ type: "client-result", by: "worker2", data: "w2-do-work", attempt: 1, timestamp: expect.any(Number) });
 
     worker1.disconnect();
     worker2.disconnect();
@@ -102,8 +101,16 @@ describe("Server + Client 集成测试", () => {
     const worker2 = createClient("p-worker2");
     const boss = createClient("p-boss");
 
-    worker1.doing(async (ct: ClientTask) => `result-1-${ct.serverTask.content}`);
-    worker2.doing(async (ct: ClientTask) => `result-2-${ct.serverTask.content}`);
+    worker1.doing(async (ct: ClientTask) => {
+      const result = `result-1-${ct.serverTask.content}`;
+      worker1.sendResult(ct.serverTask.id, true, result);
+      return result;
+    });
+    worker2.doing(async (ct: ClientTask) => {
+      const result = `result-2-${ct.serverTask.content}`;
+      worker2.sendResult(ct.serverTask.id, true, result);
+      return result;
+    });
 
     await worker1.connect();
     await worker2.connect();
@@ -122,9 +129,11 @@ describe("Server + Client 集成测试", () => {
 
     const completed = await waitFor(() => completedTasks[0]);
     expect(completed.status).toBe("completed");
-    expect(completed.resources).toHaveLength(2);
+    // 2 worker results + 1 leader review
+    expect(completed.resources).toHaveLength(3);
 
-    const bys = completed.resources.map((r) => r.by).sort();
+    const workerResults = completed.resources.filter((r) => r.type === "client-result");
+    const bys = workerResults.map((r) => r.by).sort();
     expect(bys).toEqual(["p-worker1", "p-worker2"]);
 
     worker1.disconnect();
@@ -151,7 +160,8 @@ describe("Server + Client 集成测试", () => {
     const worker = createClient("fail-worker");
     const boss = createClient("fail-boss");
 
-    worker.doing(async () => {
+    worker.doing(async (ct: ClientTask) => {
+      worker.sendResult(ct.serverTask.id, false, undefined, "something broke");
       throw new Error("something broke");
     });
 
@@ -180,7 +190,11 @@ describe("Server + Client 集成测试", () => {
     const worker = createClient("notif-worker");
     const boss = createClient("notif-boss");
 
-    worker.doing(async (ct: ClientTask) => `done-${ct.serverTask.content}`);
+    worker.doing(async (ct: ClientTask) => {
+      const result = `done-${ct.serverTask.content}`;
+      worker.sendResult(ct.serverTask.id, true, result);
+      return result;
+    });
 
     await worker.connect();
     await boss.connect();
@@ -199,7 +213,7 @@ describe("Server + Client 集成测试", () => {
 
     const statuses = taskNotifications.map((t) => t.status);
     expect(statuses).toContain("pending");
-    expect(statuses).toContain("running");
+    expect(statuses).toContain("reviewing");
     expect(statuses).toContain("completed");
 
     worker.disconnect();
@@ -229,6 +243,7 @@ describe("Server + Client 集成测试", () => {
     worker.doing(async (ct: ClientTask) => {
       executionOrder.push(ct.serverTask.content);
       await new Promise((r) => setTimeout(r, 50));
+      worker.sendResult(ct.serverTask.id, true, `done-${ct.serverTask.content}`);
       return `done-${ct.serverTask.content}`;
     });
 
@@ -278,6 +293,7 @@ describe("Server + Client 集成测试", () => {
 
     worker.doing(async (ct: ClientTask) => {
       receivedCT = ct;
+      worker.sendResult(ct.serverTask.id, true, "ok");
       return "ok";
     });
 
@@ -295,8 +311,9 @@ describe("Server + Client 集成测试", () => {
     expect(receivedCT).not.toBeNull();
     expect(receivedCT!.serverTask.content).toBe("check-client-task");
     expect(receivedCT!.serverTask.createBy).toBe("ct-boss");
-    expect(receivedCT!.status).toBe("completed");
+    expect(receivedCT!.result).toBe("ok");
     expect(receivedCT!.startedAt).toBeTypeOf("number");
+    expect(receivedCT!.completedAt).toBeTypeOf("number");
     expect(receivedCT!.id).toMatch(/^ct-/);
 
     worker.disconnect();
@@ -321,11 +338,16 @@ describe("Server + Client 集成测试", () => {
     await new Promise((r) => setTimeout(r, 200));
 
     // 注册 doing，应该立即处理排队的任务
-    worker.doing(async (ct: ClientTask) => `delayed-${ct.serverTask.content}`);
+    worker.doing(async (ct: ClientTask) => {
+      const result = `delayed-${ct.serverTask.content}`;
+      worker.sendResult(ct.serverTask.id, true, result);
+      return result;
+    });
 
     await waitFor(() => completedTasks[0]);
     expect(completedTasks[0].status).toBe("completed");
-    expect(completedTasks[0].resources[0].data).toBe("delayed-delayed-task");
+    const workerResult = completedTasks[0].resources.find((r) => r.type === "client-result");
+    expect(workerResult!.data).toBe("delayed-delayed-task");
 
     worker.disconnect();
     boss.disconnect();
