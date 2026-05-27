@@ -8,7 +8,6 @@ import { Heartbeat } from "./heartbeat.js";
 export interface ClientTask {
   id: string;
   serverTask: Task;
-  status: "pending" | "running" | "completed" | "failed";
   result?: unknown;
   error?: string;
   startedAt?: number;
@@ -18,6 +17,7 @@ export interface ClientTask {
 export type TaskHandler = (clientTask: ClientTask) => Promise<unknown>;
 
 export const SKIP_RESULT: unique symbol = Symbol("SKIP_RESULT");
+export const EXECUTION_TIMEOUT: unique symbol = Symbol("EXECUTION_TIMEOUT");
 
 export type ClientEvents = {
   "connected": () => void;
@@ -195,7 +195,6 @@ export class Client extends EventEmitter<ClientEvents> {
     const clientTask: ClientTask = {
       id: `ct-${Date.now()}-${++this.taskCounter}`,
       serverTask,
-      status: "pending",
     };
 
     this.queue.push(clientTask);
@@ -208,7 +207,6 @@ export class Client extends EventEmitter<ClientEvents> {
 
     const task = this.queue.shift()!;
     this.running = task;
-    task.status = "running";
     task.startedAt = Date.now();
     this.emit("task_started", task);
 
@@ -223,16 +221,21 @@ export class Client extends EventEmitter<ClientEvents> {
         return;
       }
 
-      task.status = "completed";
-      task.result = result;
-      task.completedAt = Date.now();
-      this.emit("task_completed", task);
-      this.pushHistory(task);
-      if (this.options.autoSendResult !== false) {
-        this.sendResult(task.serverTask.id, true, result);
+      if (result === EXECUTION_TIMEOUT) {
+        task.error = "execution_timeout";
+        task.completedAt = Date.now();
+        this.emit("task_failed", task);
+        this.pushHistory(task);
+      } else {
+        task.result = result;
+        task.completedAt = Date.now();
+        this.emit("task_completed", task);
+        this.pushHistory(task);
+        if (this.options.autoSendResult !== false) {
+          this.sendResult(task.serverTask.id, true, result);
+        }
       }
     } catch (err) {
-      task.status = "failed";
       task.error = err instanceof Error ? err.message : String(err);
       task.completedAt = Date.now();
       this.emit("task_failed", task);

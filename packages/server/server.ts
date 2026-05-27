@@ -357,32 +357,6 @@ export class Server extends EventEmitter<ServerEvents> {
     return state.task;
   }
 
-  /** Manual completion: member marks their work done, follows serial/parallel dispatch logic. */
-  manualCompleteTask(taskId: string, from: string, data?: unknown): Task | null {
-    const state = this.tasks.get(taskId);
-    if (!state) return null;
-    if (state.task.status !== "running") return null;
-    if (data) {
-      this.addResource(state.task, "client-result", from, data);
-    }
-    state.pendingClients.delete(from);
-
-    if (state.task.mode === "serial") {
-      state.serialIndex++;
-      if (state.serialIndex >= state.task.subscribe.length) {
-        this.dispatchToLeader(state);
-      } else {
-        this.dispatchSerial(state);
-      }
-    } else {
-      this.notifyTaskUpdate(state.task);
-      if (state.pendingClients.size === 0) {
-        this.dispatchToLeader(state);
-      }
-    }
-    return state.task;
-  }
-
   private processResult(clientId: string, taskId: string, success: boolean, data?: unknown, error?: string): void {
     const state = this.tasks.get(taskId);
     if (!state) return;
