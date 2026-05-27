@@ -8,6 +8,7 @@ import { Heartbeat } from "./heartbeat.js";
 export interface ClientTask {
   id: string;
   serverTask: Task;
+  reason: "execute" | "review";
   result?: unknown;
   error?: string;
   startedAt?: number;
@@ -44,7 +45,6 @@ export interface ClientOptions {
   reconnect?: boolean;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
-  autoSendResult?: boolean;
 }
 
 export class Client extends EventEmitter<ClientEvents> {
@@ -195,6 +195,7 @@ export class Client extends EventEmitter<ClientEvents> {
     const clientTask: ClientTask = {
       id: `ct-${Date.now()}-${++this.taskCounter}`,
       serverTask,
+      reason: msg.subtype === "review" ? "review" : "execute",
     };
 
     this.queue.push(clientTask);
@@ -231,23 +232,12 @@ export class Client extends EventEmitter<ClientEvents> {
         task.completedAt = Date.now();
         this.emit("task_completed", task);
         this.pushHistory(task);
-        if (this.options.autoSendResult !== false) {
-          this.sendResult(task.serverTask.id, true, result);
-        }
       }
     } catch (err) {
       task.error = err instanceof Error ? err.message : String(err);
       task.completedAt = Date.now();
       this.emit("task_failed", task);
       this.pushHistory(task);
-      if (this.options.autoSendResult !== false) {
-        this.sendResult(
-          task.serverTask.id,
-          false,
-          undefined,
-          task.error
-        );
-      }
     }
 
     this.running = null;
@@ -262,7 +252,7 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
-  private sendResult(taskId: string, success: boolean, data?: unknown, error?: string): void {
+  sendResult(taskId: string, success: boolean, data?: unknown, error?: string): void {
     const msg = createMessage("result", this.options.id, "server", {
       taskId,
       success,

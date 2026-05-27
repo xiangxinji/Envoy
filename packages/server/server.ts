@@ -148,6 +148,10 @@ export class Server extends EventEmitter<ServerEvents> {
   }
 
   submitFrom(fromId: string, options: SubmitOptions): string {
+    return this.createTaskAndDispatch(fromId, options);
+  }
+
+  private createTaskAndDispatch(fromId: string, options: SubmitOptions): string {
     const taskId = `task-${Date.now()}-${++this.taskCounter}`;
     const task: Task = {
       id: taskId,
@@ -200,7 +204,7 @@ export class Server extends EventEmitter<ServerEvents> {
       this.connectionManager.removeClient(id);
       this.emit("client:offline", { id });
       this.notifyWatchers("client:offline", { id });
-      this.failClientTasks(id);
+      this.handleClientOffline(id);
     });
 
     this.transport.on("message", (clientId: unknown, msg: unknown) => {
@@ -212,7 +216,7 @@ export class Server extends EventEmitter<ServerEvents> {
     this.connectionManager.on("client:offline", (clientId: unknown) => {
       const id = clientId as string;
       this.emit("client:offline", { id });
-      this.failClientTasks(id);
+      this.handleClientOffline(id);
     });
   }
 
@@ -254,36 +258,7 @@ export class Server extends EventEmitter<ServerEvents> {
       return;
     }
 
-    const taskId = `task-${Date.now()}-${++this.taskCounter}`;
-    const task: Task = {
-      id: taskId,
-      createBy: clientId,
-      subscribe: payload.subscribe,
-      content: payload.content,
-      mode: payload.mode,
-      status: "pending",
-      resources: [],
-      createdAt: Date.now(),
-      attempt: 1,
-    };
-
-    const state: TaskState = {
-      task,
-      serialIndex: 0,
-      pendingClients: new Set(payload.subscribe),
-      leaderReviewing: false,
-      retryCount: 0,
-    };
-    this.tasks.set(taskId, state);
-
-    this.emit("task:created", task);
-    this.notifyTaskUpdate(task);
-
-    if (task.mode === "serial") {
-      this.dispatchSerial(state);
-    } else {
-      this.dispatchParallel(state);
-    }
+    this.createTaskAndDispatch(clientId, payload);
   }
 
   private dispatchSerial(state: TaskState): void {
@@ -431,7 +406,7 @@ export class Server extends EventEmitter<ServerEvents> {
     task.status = "reviewing";
     this.notifyTaskUpdate(task);
 
-    const dispatchMsg = createMessage("dispatch", "server", leaderId, task);
+    const dispatchMsg = createMessage("dispatch", "server", leaderId, task, { subtype: "review" });
     this.transport.send(leaderId, dispatchMsg);
   }
 
@@ -493,7 +468,7 @@ export class Server extends EventEmitter<ServerEvents> {
     }
   }
 
-  private failClientTasks(clientId: string): void {
+  private handleClientOffline(clientId: string): void {
     for (const [, state] of this.tasks) {
       const taskStatus = state.task.status;
       if (taskStatus !== "running" && taskStatus !== "pending" && taskStatus !== "reviewing") continue;
