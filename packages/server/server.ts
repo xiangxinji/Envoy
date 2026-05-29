@@ -101,6 +101,16 @@ export class Server extends EventEmitter<ServerEvents> {
     return [...this.tasks.values()].map((ts) => ts.task);
   }
 
+  removeTask(taskId: string): boolean {
+    return this.tasks.delete(taskId);
+  }
+
+  removeAllTasks(): number {
+    const count = this.tasks.size;
+    this.tasks.clear();
+    return count;
+  }
+
   loadTaskStates(entries: Array<{ task: Task; state: SerializedTaskState }>): void {
     for (const { task, state } of entries) {
       if (this.tasks.has(task.id)) continue;
