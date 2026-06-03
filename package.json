@@ -2,6 +2,7 @@
   "name": "envoy",
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "npm@10.9.0",
   "main": "./dist/index.js",
   "exports": {
     "./server": "./dist/server/index.js",
@@ -26,6 +27,6 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.21.0"
   }
 }
